@@ -1,0 +1,51 @@
+name: [mercari] Build
+
+on:
+  push:
+    branches:
+      - mercari-develop
+      # TODO: remove
+      - ci/add-github-packages-build
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+    
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install Yarn
+        run: npm install -g yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build frontend assets
+        run: yarn build
+
+      - name: Authenticate to GitHub packages
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: ./godelw docker build
+
+      - name: Retag Docker image
+        run: |
+          docker tag palantirtechnologies/policy-bot:latest ghcr.io/mercari/policy-bot:latest
+
+      - name: Push Docker iamge
+        run: |
+          docker push ghcr.io/mercari/policy-bot:latest
