@@ -45,7 +45,7 @@ type Actors struct {
 
 // IsZero returns true if no conditions for actors are defined.
 func (a *Actors) IsZero() bool {
-	return a == nil || (len(a.Users) == 0 && len(a.Teams) == 0 && len(a.Organizations) == 0 &&
+	return a == nil || (len(a.Users) == 0 && len(a.UserTypes) == 0 && len(a.Teams) == 0 && len(a.Organizations) == 0 &&
 		len(a.Permissions) == 0 && !a.Admins && !a.WriteCollaborators)
 }
 
