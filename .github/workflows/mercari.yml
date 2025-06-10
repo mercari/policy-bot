@@ -42,10 +42,5 @@ jobs:
       - name: Build Docker image
         run: ./godelw docker build
 
-      - name: Retag Docker image
-        run: |
-          docker tag palantirtechnologies/policy-bot:latest ghcr.io/mercari/policy-bot:latest
-
       - name: Push Docker iamge
-        run: |
-          docker push ghcr.io/mercari/policy-bot:latest
+        run: ./godelw docker push --repository ghcr.io/
