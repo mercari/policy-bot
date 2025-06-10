@@ -40,7 +40,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker image
-        run: ./godelw docker build
+        run: ./godelw docker build --repository ghcr.io/
 
       - name: Push Docker iamge
         run: ./godelw docker push --repository ghcr.io/
