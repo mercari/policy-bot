@@ -1,4 +1,4 @@
-name: [mercari] Build
+name: "[mercari] Build"
 
 on:
   push:
