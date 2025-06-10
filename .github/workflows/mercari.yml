@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - mercari-develop
-      # TODO: remove
-      - ci/add-github-packages-build
 
 permissions:
   contents: read
