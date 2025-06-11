@@ -41,8 +41,8 @@ products:
             cp -R docker/* ${CONTEXT_DIR}
             cp -R config ${CONTEXT_DIR}
           tag-templates:
-            version: "{{Repository}}palantirtechnologies/policy-bot:{{Version}}"
-            latest: "{{Repository}}palantirtechnologies/policy-bot:latest"
-            snapshot: "{{Repository}}palantirtechnologies/policy-bot:snapshot"
+            version: "{{Repository}}mercari/policy-bot:{{Version}}"
+            latest: "{{Repository}}mercari/policy-bot:latest"
+            snapshot: "{{Repository}}mercari/policy-bot:snapshot"
     publish:
       group-id: com.palantir.policy-bot
