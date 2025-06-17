@@ -37,7 +37,8 @@ var _ Predicate = CustomProperty{}
 
 func (pred CustomProperty) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
 	predicateResult := common.PredicateResult{
-		ValuePhrase: fmt.Sprintf("custom property values with key \"%s\"", pred.Key),
+		ValuePhrase:     fmt.Sprintf("custom property values with key \"%s\"", pred.Key),
+		ConditionPhrase: "satisfy",
 	}
 
 	if pred.Key == "" {
@@ -69,13 +70,13 @@ func (pred CustomProperty) Evaluate(ctx context.Context, prctx pull.Context) (*c
 
 	if pred.IsNull && !ok {
 		predicateResult.Satisfied = true
-		predicateResult.ConditionPhrase = "is null"
+		predicateResult.ConditionsMap = map[string][]string{"is null": {"true"}}
 		predicateResult.Description = "Custom property is null"
 		return &predicateResult, nil
 	}
 	if pred.NotNull && ok {
 		predicateResult.Satisfied = true
-		predicateResult.ConditionPhrase = "is not null"
+		predicateResult.ConditionsMap = map[string][]string{"is not null": {"true"}}
 		predicateResult.Description = "Custom property is not null"
 		return &predicateResult, nil
 	}

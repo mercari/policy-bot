@@ -26,7 +26,10 @@ func TestCustomPropertiesIsNullRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: true,
-				Values:    []string{"custom-property-key"},
+				Values:    nil,
+				ConditionsMap: map[string][]string{
+					"is null": {"true"},
+				},
 			},
 		},
 		{
@@ -40,7 +43,7 @@ func TestCustomPropertiesIsNullRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: false,
-				Values:    []string{"custom-property-key"},
+				Values:    []string{"value"},
 				ConditionsMap: map[string][]string{
 					"is null": {"true"},
 				},
@@ -67,7 +70,10 @@ func TestCustomPropertiesNotNullRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: true,
-				Values:    []string{"custom-property-key"},
+				Values:    []string{"value"},
+				ConditionsMap: map[string][]string{
+					"is not null": {"true"},
+				},
 			},
 		},
 		{
@@ -77,9 +83,9 @@ func TestCustomPropertiesNotNullRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: false,
-				Values:    []string{"custom-property-key"},
+				Values:    nil,
 				ConditionsMap: map[string][]string{
-					"not null": {"true"},
+					"is not null": {"true"},
 				},
 			},
 		},
@@ -106,9 +112,9 @@ func TestCustomPropertiesMatchesRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: true,
-				Values:    []string{"custom-property-key"},
+				Values:    []string{"value123"},
 				ConditionsMap: map[string][]string{
-					"matches": {"^value.*$"},
+					"matches any of": {"^value.*$"},
 				},
 			},
 		},
@@ -123,9 +129,9 @@ func TestCustomPropertiesMatchesRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: false,
-				Values:    []string{"custom-property-key"},
+				Values:    []string{"other-value"},
 				ConditionsMap: map[string][]string{
-					"matches": {"^value.*$"},
+					"matches any of": {"^value.*$"},
 				},
 			},
 		},
@@ -136,9 +142,9 @@ func TestCustomPropertiesMatchesRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: false,
-				Values:    []string{"custom-property-key"},
+				Values:    nil,
 				ConditionsMap: map[string][]string{
-					"matches": {"^value.*$"},
+					"matches any of": {"^value.*$"},
 				},
 			},
 		},
@@ -165,9 +171,9 @@ func TestCustomPropertiesNotMatchesRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: true,
-				Values:    []string{"custom-property-key"},
+				Values:    []string{"other-value"},
 				ConditionsMap: map[string][]string{
-					"not matches": {"^value.*$"},
+					"matches none of": {"^value.*$"},
 				},
 			},
 		},
@@ -182,9 +188,9 @@ func TestCustomPropertiesNotMatchesRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: false,
-				Values:    []string{"custom-property-key"},
+				Values:    []string{"value123"},
 				ConditionsMap: map[string][]string{
-					"not matches": {"^value.*$"},
+					"matches none of": {"^value.*$"},
 				},
 			},
 		},
@@ -195,9 +201,9 @@ func TestCustomPropertiesNotMatchesRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: false,
-				Values:    []string{"custom-property-key"},
+				Values:    nil,
 				ConditionsMap: map[string][]string{
-					"not matches": {"^value.*$"},
+					"matches none of": {"^value.*$"},
 				},
 			},
 		},
@@ -222,9 +228,9 @@ func TestCustomPropertiesContainsRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: true,
-				Values:    []string{"custom-property-key"},
+				Values:    []string{"value", "other-value"},
 				ConditionsMap: map[string][]string{
-					"contains": {"value"},
+					"contains any of": {"value"},
 				},
 			},
 		},
@@ -239,9 +245,9 @@ func TestCustomPropertiesContainsRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: false,
-				Values:    []string{"custom-property-key"},
+				Values:    []string{"other-value"},
 				ConditionsMap: map[string][]string{
-					"contains": {"value"},
+					"contains any of": {"value"},
 				},
 			},
 		},
@@ -256,9 +262,9 @@ func TestCustomPropertiesContainsRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: false,
-				Values:    []string{"custom-property-key"},
+				Values:    []string{"value"},
 				ConditionsMap: map[string][]string{
-					"contains": {"value"},
+					"contains any of": {"value"},
 				},
 			},
 		},
@@ -269,9 +275,9 @@ func TestCustomPropertiesContainsRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: false,
-				Values:    []string{"custom-property-key"},
+				Values:    nil,
 				ConditionsMap: map[string][]string{
-					"contains": {"value"},
+					"contains any of": {"value"},
 				},
 			},
 		},
@@ -296,9 +302,9 @@ func TestCustomPropertiesNotContainsRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: true,
-				Values:    []string{"custom-property-key"},
+				Values:    []string{"other-value"},
 				ConditionsMap: map[string][]string{
-					"not contains": {"value"},
+					"contains none of": {"value"},
 				},
 			},
 		},
@@ -313,9 +319,9 @@ func TestCustomPropertiesNotContainsRule(t *testing.T) {
 			},
 			&common.PredicateResult{
 				Satisfied: false,
-				Values:    []string{"custom-property-key"},
+				Values:    []string{"value", "other-value"},
 				ConditionsMap: map[string][]string{
-					"not contains": {"value"},
+					"contains none of": {"value"},
 				},
 			},
 		},
