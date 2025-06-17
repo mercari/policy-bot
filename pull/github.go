@@ -198,7 +198,7 @@ func (ghc *GitHubContext) RepositoryName() string {
 }
 
 func (ghc *GitHubContext) RepositoryCustomProperties() (map[string]CustomProperty, error) {
-	if ghc.globalCache != nil {
+	if ghc.repoCustomProperties == nil {
 		if err := ghc.loadRepositoryCustomProperties(); err != nil {
 			return nil, err
 		}
