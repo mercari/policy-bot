@@ -17,7 +17,6 @@ package predicate
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/palantir/policy-bot/policy/common"
 	"github.com/palantir/policy-bot/pull"
@@ -33,18 +32,14 @@ type CustomProperty struct {
 	NotNull bool `yaml:"not_null,omitempty"`
 
 	// Only works for string values. For non-string values, any value specified here will result in the predicate failing.
-	Matches []common.Regexp `yaml:"matches,omitempty"`
+	MatchesAnyOf []common.Regexp `yaml:"matches_any_of,omitempty"`
 
 	// Evaluated before Matches.
 	// Only works for string values. For non-string values, any value specified here will result in the predicate failing.
-	NotMatches []common.Regexp `yaml:"not_matches,omitempty"`
+	MatchesNoneOf []common.Regexp `yaml:"matches_none_of,omitempty"`
 
-	// Only works for array values. For non-array values, any value specified here will result in the predicate failing.
-	Contains []string `yaml:"contains,omitempty"`
-
-	// Evaluated before Contains.
-	// Only works for array values. For non-array values, any value specified here will result in the predicate failing.
-	NotContains []string `yaml:"not_contains,omitempty"`
+	// Note: array support is not implemented yet.
+	// Suggested implementation: ContainsAnyOf, ContainsAllOf, ContainsNoneOf
 }
 
 var _ Predicate = CustomProperty{}
@@ -62,7 +57,7 @@ func (pred CustomProperty) Evaluate(ctx context.Context, prctx pull.Context) (*c
 	}
 
 	// If no matches or not matches are provided, we assume that the custom properties are not required
-	if !pred.IsNull && !pred.NotNull && len(pred.Matches) == 0 && len(pred.NotMatches) == 0 && len(pred.Contains) == 0 && len(pred.NotContains) == 0 {
+	if !pred.IsNull && !pred.NotNull && len(pred.MatchesAnyOf) == 0 && len(pred.MatchesNoneOf) == 0 {
 		predicateResult.Satisfied = false
 		predicateResult.Description = "Custom property predicate is not configured to match any values"
 		return &predicateResult, nil
@@ -95,63 +90,37 @@ func (pred CustomProperty) Evaluate(ctx context.Context, prctx pull.Context) (*c
 		return &predicateResult, nil
 	}
 
-	var matchesPatterns, notMatchesPatterns []string
+	var matchesAnyOfPatterns, matchesNoneOfPatterns []string
 
-	for _, reg := range pred.Matches {
-		matchesPatterns = append(matchesPatterns, reg.String())
+	for _, reg := range pred.MatchesAnyOf {
+		matchesAnyOfPatterns = append(matchesAnyOfPatterns, reg.String())
 	}
 
-	for _, reg := range pred.NotMatches {
-		notMatchesPatterns = append(notMatchesPatterns, reg.String())
+	for _, reg := range pred.MatchesNoneOf {
+		matchesNoneOfPatterns = append(matchesNoneOfPatterns, reg.String())
 	}
 
 	if customProperty.String != nil {
-		for _, matcher := range pred.Matches {
+		for _, matcher := range pred.MatchesAnyOf {
 			if matcher.Matches(*customProperty.String) {
 				predicateResult.Satisfied = true
-				predicateResult.ConditionsMap = map[string][]string{"matches any of": matchesPatterns}
+				predicateResult.ConditionsMap = map[string][]string{"matches any of": matchesAnyOfPatterns}
 				predicateResult.Description = "Custom property matches one or more Matches patterns"
 				return &predicateResult, nil
 			}
 		}
 
-		if len(pred.NotMatches) > 0 {
+		if len(pred.MatchesNoneOf) > 0 {
 			matched := false
-			for _, matcher := range pred.NotMatches {
+			for _, matcher := range pred.MatchesNoneOf {
 				if matcher.Matches(*customProperty.String) {
 					matched = true
 				}
 			}
 			if !matched {
 				predicateResult.Satisfied = true
-				predicateResult.ConditionsMap = map[string][]string{"matches none of": notMatchesPatterns}
+				predicateResult.ConditionsMap = map[string][]string{"matches none of": matchesNoneOfPatterns}
 				predicateResult.Description = "Custom property does not match any NotMatches pattern"
-				return &predicateResult, nil
-			}
-		}
-	}
-
-	if customProperty.Array != nil {
-		for _, contains := range pred.Contains {
-			if slices.Contains(customProperty.Array, contains) {
-				predicateResult.Satisfied = true
-				predicateResult.ConditionsMap = map[string][]string{"contains any of": pred.Contains}
-				predicateResult.Description = "Custom property contains one or more items in the Contains list"
-				return &predicateResult, nil
-			}
-		}
-
-		if len(pred.NotContains) > 0 {
-			contains := false
-			for _, notContains := range pred.NotContains {
-				if slices.Contains(customProperty.Array, notContains) {
-					contains = true
-				}
-			}
-			if !contains {
-				predicateResult.Satisfied = true
-				predicateResult.ConditionsMap = map[string][]string{"contains none of": pred.NotContains}
-				predicateResult.Description = "Custom property does not contain any items from the NotContains list"
 				return &predicateResult, nil
 			}
 		}
@@ -166,17 +135,11 @@ func (pred CustomProperty) Evaluate(ctx context.Context, prctx pull.Context) (*c
 	if pred.NotNull {
 		predicateResult.ConditionsMap["is not null"] = []string{"true"}
 	}
-	if len(pred.Matches) > 0 {
-		predicateResult.ConditionsMap["matches any of"] = matchesPatterns
+	if len(pred.MatchesAnyOf) > 0 {
+		predicateResult.ConditionsMap["matches any of"] = matchesAnyOfPatterns
 	}
-	if len(pred.NotMatches) > 0 {
-		predicateResult.ConditionsMap["matches none of"] = notMatchesPatterns
-	}
-	if len(pred.Contains) > 0 {
-		predicateResult.ConditionsMap["contains any of"] = pred.Contains
-	}
-	if len(pred.NotContains) > 0 {
-		predicateResult.ConditionsMap["contains none of"] = pred.NotContains
+	if len(pred.MatchesNoneOf) > 0 {
+		predicateResult.ConditionsMap["matches none of"] = matchesNoneOfPatterns
 	}
 	return &predicateResult, nil
 }

@@ -106,10 +106,10 @@ func TestCustomPropertiesNotNullRule(t *testing.T) {
 	})
 }
 
-func TestCustomPropertiesMatchesRule(t *testing.T) {
+func TestCustomPropertiesMatchesAnyOf(t *testing.T) {
 	p := &CustomProperty{
 		Key: "custom-property-key",
-		Matches: []common.Regexp{
+		MatchesAnyOf: []common.Regexp{
 			common.NewCompiledRegexp(regexp.MustCompile("^value.*$")),
 		},
 	}
@@ -165,10 +165,10 @@ func TestCustomPropertiesMatchesRule(t *testing.T) {
 	})
 }
 
-func TestCustomPropertiesNotMatchesRule(t *testing.T) {
+func TestCustomPropertiesMatchesNoneOf(t *testing.T) {
 	p := &CustomProperty{
 		Key: "custom-property-key",
-		NotMatches: []common.Regexp{
+		MatchesNoneOf: []common.Regexp{
 			common.NewCompiledRegexp(regexp.MustCompile("^value.*$")),
 		},
 	}
@@ -218,124 +218,6 @@ func TestCustomPropertiesNotMatchesRule(t *testing.T) {
 				Values:    nil,
 				ConditionsMap: map[string][]string{
 					"matches none of": {"^value.*$"},
-				},
-			},
-		},
-	})
-}
-
-func TestCustomPropertiesContainsRule(t *testing.T) {
-	p := &CustomProperty{
-		Key:      "custom-property-key",
-		Contains: []string{"value"},
-	}
-
-	runCustomPropertiesTestCase(t, p, []CustomPropertiesTestCase{
-		{
-			"custom property contains pattern",
-			&pulltest.Context{
-				RepositoryCustomPropertiesValue: map[string]pull.CustomProperty{
-					"custom-property-key": {
-						Array: []string{"value", "other-value"},
-					},
-				},
-			},
-			&common.PredicateResult{
-				Satisfied: true,
-				Values:    []string{"value", "other-value"},
-				ConditionsMap: map[string][]string{
-					"contains any of": {"value"},
-				},
-			},
-		},
-		{
-			"custom property does not contain pattern",
-			&pulltest.Context{
-				RepositoryCustomPropertiesValue: map[string]pull.CustomProperty{
-					"custom-property-key": {
-						Array: []string{"other-value"},
-					},
-				},
-			},
-			&common.PredicateResult{
-				Satisfied: false,
-				Values:    []string{"other-value"},
-				ConditionsMap: map[string][]string{
-					"contains any of": {"value"},
-				},
-			},
-		},
-		{
-			"custom property is of wrong type",
-			&pulltest.Context{
-				RepositoryCustomPropertiesValue: map[string]pull.CustomProperty{
-					"custom-property-key": {
-						String: github.Ptr("value"),
-					},
-				},
-			},
-			&common.PredicateResult{
-				Satisfied: false,
-				Values:    []string{"value"},
-				ConditionsMap: map[string][]string{
-					"contains any of": {"value"},
-				},
-			},
-		},
-		{
-			"custom property is not set",
-			&pulltest.Context{
-				RepositoryCustomPropertiesValue: map[string]pull.CustomProperty{},
-			},
-			&common.PredicateResult{
-				Satisfied: false,
-				Values:    nil,
-				ConditionsMap: map[string][]string{
-					"contains any of": {"value"},
-				},
-			},
-		},
-	})
-}
-
-func TestCustomPropertiesNotContainsRule(t *testing.T) {
-	p := &CustomProperty{
-		Key:         "custom-property-key",
-		NotContains: []string{"value"},
-	}
-
-	runCustomPropertiesTestCase(t, p, []CustomPropertiesTestCase{
-		{
-			"custom property does not contain pattern",
-			&pulltest.Context{
-				RepositoryCustomPropertiesValue: map[string]pull.CustomProperty{
-					"custom-property-key": {
-						Array: []string{"other-value"},
-					},
-				},
-			},
-			&common.PredicateResult{
-				Satisfied: true,
-				Values:    []string{"other-value"},
-				ConditionsMap: map[string][]string{
-					"contains none of": {"value"},
-				},
-			},
-		},
-		{
-			"custom property contains pattern",
-			&pulltest.Context{
-				RepositoryCustomPropertiesValue: map[string]pull.CustomProperty{
-					"custom-property-key": {
-						Array: []string{"value", "other-value"},
-					},
-				},
-			},
-			&common.PredicateResult{
-				Satisfied: false,
-				Values:    []string{"value", "other-value"},
-				ConditionsMap: map[string][]string{
-					"contains none of": {"value"},
 				},
 			},
 		},
