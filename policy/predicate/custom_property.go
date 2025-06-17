@@ -2,6 +2,7 @@ package predicate
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	"github.com/palantir/policy-bot/policy/common"
@@ -9,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type CustomProperties struct {
+type CustomProperty struct {
 	Key string `yaml:"key,omitempty"`
 
 	// This predicate evaluates to true if any of the following conditions are met.
@@ -32,17 +33,16 @@ type CustomProperties struct {
 	NotContains []string `yaml:"not_contains,omitempty"`
 }
 
-var _ Predicate = CustomProperties{}
+var _ Predicate = CustomProperty{}
 
-func (pred CustomProperties) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
+func (pred CustomProperty) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
 	predicateResult := common.PredicateResult{
-		ValuePhrase: "custom property",
-		Values:      []string{pred.Key},
+		ValuePhrase: fmt.Sprintf("custom property values with key \"%s\"", pred.Key),
 	}
 
 	if pred.Key == "" {
 		predicateResult.Satisfied = false
-		predicateResult.Description = "Custom property key is empty"
+		predicateResult.Description = "Custom property key is unset"
 		return &predicateResult, nil
 	}
 
@@ -59,6 +59,14 @@ func (pred CustomProperties) Evaluate(ctx context.Context, prctx pull.Context) (
 	}
 
 	customProperty, ok := customProperties[pred.Key]
+	if ok {
+		if customProperty.String != nil {
+			predicateResult.Values = []string{*customProperty.String}
+		} else if customProperty.Array != nil {
+			predicateResult.Values = customProperty.Array
+		}
+	}
+
 	if pred.IsNull && !ok {
 		predicateResult.Satisfied = true
 		predicateResult.ConditionPhrase = "is null"
@@ -86,8 +94,8 @@ func (pred CustomProperties) Evaluate(ctx context.Context, prctx pull.Context) (
 		for _, matcher := range pred.Matches {
 			if matcher.Matches(*customProperty.String) {
 				predicateResult.Satisfied = true
-				predicateResult.ConditionsMap = map[string][]string{"matches": matchesPatterns}
-				predicateResult.Description = "Custom property matches a Match pattern"
+				predicateResult.ConditionsMap = map[string][]string{"matches any of": matchesPatterns}
+				predicateResult.Description = "Custom property matches one or more Matches patterns"
 				return &predicateResult, nil
 			}
 		}
@@ -101,8 +109,8 @@ func (pred CustomProperties) Evaluate(ctx context.Context, prctx pull.Context) (
 			}
 			if !matched {
 				predicateResult.Satisfied = true
-				predicateResult.ConditionsMap = map[string][]string{"not matches": notMatchesPatterns}
-				predicateResult.Description = "Custom property does not match any NotMatch patterns"
+				predicateResult.ConditionsMap = map[string][]string{"matches none of": notMatchesPatterns}
+				predicateResult.Description = "Custom property does not match any NotMatches pattern"
 				return &predicateResult, nil
 			}
 		}
@@ -112,8 +120,8 @@ func (pred CustomProperties) Evaluate(ctx context.Context, prctx pull.Context) (
 		for _, contains := range pred.Contains {
 			if slices.Contains(customProperty.Array, contains) {
 				predicateResult.Satisfied = true
-				predicateResult.ConditionsMap = map[string][]string{"contains": pred.Contains}
-				predicateResult.Description = "Custom property contains an item from Contains list"
+				predicateResult.ConditionsMap = map[string][]string{"contains any of": pred.Contains}
+				predicateResult.Description = "Custom property contains one or more items in the Contains list"
 				return &predicateResult, nil
 			}
 		}
@@ -127,37 +135,38 @@ func (pred CustomProperties) Evaluate(ctx context.Context, prctx pull.Context) (
 			}
 			if !contains {
 				predicateResult.Satisfied = true
-				predicateResult.ConditionsMap = map[string][]string{"not contains": pred.NotContains}
-				predicateResult.Description = "Custom property does not contain any items from NotContains list"
+				predicateResult.ConditionsMap = map[string][]string{"contains none of": pred.NotContains}
+				predicateResult.Description = "Custom property does not contain any items from the NotContains list"
 				return &predicateResult, nil
 			}
 		}
 	}
 
 	predicateResult.Satisfied = false
+	predicateResult.Description = "Custom property does not satisfy any conditions configured"
 	predicateResult.ConditionsMap = map[string][]string{}
 	if pred.IsNull {
 		predicateResult.ConditionsMap["is null"] = []string{"true"}
 	}
 	if pred.NotNull {
-		predicateResult.ConditionsMap["not null"] = []string{"true"}
+		predicateResult.ConditionsMap["is not null"] = []string{"true"}
 	}
 	if len(pred.Matches) > 0 {
-		predicateResult.ConditionsMap["matches"] = matchesPatterns
+		predicateResult.ConditionsMap["matches any of"] = matchesPatterns
 	}
 	if len(pred.NotMatches) > 0 {
-		predicateResult.ConditionsMap["not matches"] = notMatchesPatterns
+		predicateResult.ConditionsMap["matches none of"] = notMatchesPatterns
 	}
 	if len(pred.Contains) > 0 {
-		predicateResult.ConditionsMap["contains"] = pred.Contains
+		predicateResult.ConditionsMap["contains any of"] = pred.Contains
 	}
 	if len(pred.NotContains) > 0 {
-		predicateResult.ConditionsMap["not contains"] = pred.NotContains
+		predicateResult.ConditionsMap["contains none of"] = pred.NotContains
 	}
 	return &predicateResult, nil
 }
 
 // Ideally we would be able to trigger on custom properties change, but it is not possible right now
-func (pred CustomProperties) Trigger() common.Trigger {
+func (pred CustomProperty) Trigger() common.Trigger {
 	return common.TriggerStatic
 }

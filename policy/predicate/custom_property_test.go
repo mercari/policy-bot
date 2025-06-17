@@ -13,7 +13,7 @@ import (
 )
 
 func TestCustomPropertiesIsNullRule(t *testing.T) {
-	p := &CustomProperties{
+	p := &CustomProperty{
 		Key:    "custom-property-key",
 		IsNull: true,
 	}
@@ -50,7 +50,7 @@ func TestCustomPropertiesIsNullRule(t *testing.T) {
 }
 
 func TestCustomPropertiesNotNullRule(t *testing.T) {
-	p := &CustomProperties{
+	p := &CustomProperty{
 		Key:     "custom-property-key",
 		NotNull: true,
 	}
@@ -87,7 +87,7 @@ func TestCustomPropertiesNotNullRule(t *testing.T) {
 }
 
 func TestCustomPropertiesMatchesRule(t *testing.T) {
-	p := &CustomProperties{
+	p := &CustomProperty{
 		Key: "custom-property-key",
 		Matches: []common.Regexp{
 			common.NewCompiledRegexp(regexp.MustCompile("^value.*$")),
@@ -146,7 +146,7 @@ func TestCustomPropertiesMatchesRule(t *testing.T) {
 }
 
 func TestCustomPropertiesNotMatchesRule(t *testing.T) {
-	p := &CustomProperties{
+	p := &CustomProperty{
 		Key: "custom-property-key",
 		NotMatches: []common.Regexp{
 			common.NewCompiledRegexp(regexp.MustCompile("^value.*$")),
@@ -205,7 +205,7 @@ func TestCustomPropertiesNotMatchesRule(t *testing.T) {
 }
 
 func TestCustomPropertiesContainsRule(t *testing.T) {
-	p := &CustomProperties{
+	p := &CustomProperty{
 		Key:      "custom-property-key",
 		Contains: []string{"value"},
 	}
@@ -279,7 +279,7 @@ func TestCustomPropertiesContainsRule(t *testing.T) {
 }
 
 func TestCustomPropertiesNotContainsRule(t *testing.T) {
-	p := &CustomProperties{
+	p := &CustomProperty{
 		Key:         "custom-property-key",
 		NotContains: []string{"value"},
 	}

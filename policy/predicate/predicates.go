@@ -49,6 +49,8 @@ type Predicates struct {
 	HasValidSignatures       *HasValidSignatures       `yaml:"has_valid_signatures,omitempty"`
 	HasValidSignaturesBy     *HasValidSignaturesBy     `yaml:"has_valid_signatures_by,omitempty"`
 	HasValidSignaturesByKeys *HasValidSignaturesByKeys `yaml:"has_valid_signatures_by_keys,omitempty"`
+
+	CustomProperties *[]CustomProperty `yaml:"custom_properties,omitempty"`
 }
 
 func (p Predicates) IsZero() bool {
@@ -138,6 +140,12 @@ func (p *Predicates) Predicates() []Predicate {
 
 	if p.HasValidSignaturesByKeys != nil {
 		ps = append(ps, Predicate(p.HasValidSignaturesByKeys))
+	}
+
+	if p.CustomProperties != nil {
+		for _, customProperty := range *p.CustomProperties {
+			ps = append(ps, Predicate(customProperty))
+		}
 	}
 
 	return ps
