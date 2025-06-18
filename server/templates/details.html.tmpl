@@ -176,6 +176,9 @@
       {{else}}
         There are no {{.ValuePhrase}}
       {{end}}
+      {{if .Description}}
+        <div class="text-gray3">Description: {{.Description}}</div>
+      {{end}}
     </li>
   {{end}}
   </ul>
