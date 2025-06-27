@@ -39,6 +39,10 @@ type PullEvaluationOptions struct {
 	// pattern: <StatusCheckContext>: <Base Branch Name>
 	StatusCheckContext string `yaml:"status_check_context"`
 
+	// StatusCheckContextIgnoreBase will ignore the base branch name when creating the status context.
+	// pattern: <StatusCheckContext>
+	StatusCheckContextIgnoreBase bool `yaml:"status_check_context_ignore_base"`
+
 	// ExpandRequiredReviewers enables a UI feature where the details page
 	// shows a list of the users who can approve each rule. Enabling this
 	// feature can leak information about team membership and permissions that
