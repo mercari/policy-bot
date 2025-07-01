@@ -34,9 +34,16 @@ import (
 	"github.com/palantir/go-githubapp/oauth2"
 	"github.com/palantir/policy-bot/pull"
 	"github.com/palantir/policy-bot/server/handler"
+	policybototel "github.com/palantir/policy-bot/server/otel"
 	"github.com/palantir/policy-bot/version"
 	"github.com/pkg/errors"
+	"github.com/rcrowley/go-metrics"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/contrib/exporters/autoexport"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/contrib/propagators/autoprop"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"goji.io"
 	"goji.io/pat"
 )
@@ -64,6 +71,9 @@ func New(c *Config) (*Server, error) {
 		Level:  c.Logging.Level,
 		Pretty: c.Logging.Text,
 	})
+	if c.OpenTelemetry.Enabled && c.OpenTelemetry.GoogleCloudSupport {
+		logger = logger.Hook(&policybototel.OtelZerologGoogleCloudHook{})
+	}
 
 	lifetime, _ := time.ParseDuration(c.Sessions.Lifetime)
 	if lifetime == 0 {
@@ -88,7 +98,19 @@ func New(c *Config) (*Server, error) {
 	sessions.HttpOnly(true)
 	sessions.Secure(forceTLS)
 
-	base, err := baseapp.NewServer(c.Server, baseapp.DefaultParams(logger, "policybot.")...)
+	params := baseapp.DefaultParams(logger, "policybot.")
+	if c.OpenTelemetry.Enabled {
+		// WithMiddleware overwrites the middleware stack, so we have to generate the default and prepend to it
+		middlewares := append(
+			[]func(http.Handler) http.Handler{
+				func(h http.Handler) http.Handler { return otelhttp.NewHandler(h, "policy-bot") },
+			},
+			baseapp.DefaultMiddleware(logger, metrics.NewPrefixedRegistry("policybot."))...,
+		)
+		params = append(params, baseapp.WithMiddleware(middlewares...))
+	}
+
+	base, err := baseapp.NewServer(c.Server, params...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize base server")
 	}
@@ -108,9 +130,15 @@ func New(c *Config) (*Server, error) {
 		return nil, errors.Wrap(err, "invalid v4 API URL")
 	}
 
+	transport := http.DefaultTransport
+	if c.OpenTelemetry.Enabled {
+		transport = otelhttp.NewTransport(transport)
+	}
+
 	userAgent := fmt.Sprintf("policy-bot/%s", version.GetVersion())
 	cc, err := githubapp.NewDefaultCachingClientCreator(
 		c.Github,
+		githubapp.WithTransport(transport),
 		githubapp.WithClientUserAgent(userAgent),
 		githubapp.WithClientTimeout(githubTimeout),
 		githubapp.WithClientCaching(true, func() httpcache.Cache {
@@ -210,6 +238,15 @@ func New(c *Config) (*Server, error) {
 	templates, err := handler.LoadTemplates(&c.Files, basePath, c.Github.WebURL)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load templates")
+	}
+
+	if c.OpenTelemetry.Enabled {
+		otel.SetTextMapPropagator(autoprop.NewTextMapPropagator())
+		texporter, err := autoexport.NewSpanExporter(context.Background())
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create OpenTelemetry exporter")
+		}
+		otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithBatcher(texporter)))
 	}
 
 	var mux *goji.Mux
