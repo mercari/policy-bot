@@ -37,7 +37,7 @@ func Validate() http.Handler {
 		ctx := r.Context()
 		logger := zerolog.Ctx(ctx)
 
-		logger.Info().Msg("Attempting to validate policy file")
+		logger.Info().Ctx(ctx).Msg("Attempting to validate policy file")
 		check := ValidateCheck{Version: version.GetVersion()}
 
 		requestPolicy, err := ioutil.ReadAll(r.Body)

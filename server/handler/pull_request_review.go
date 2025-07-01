@@ -73,7 +73,7 @@ func (h *PullRequestReview) Handle(ctx context.Context, eventType, deliveryID st
 
 	reviewState := pull.ReviewState(event.GetReview().GetState())
 	if !h.affectsApproval(reviewState, evalCtx.Config.Config) {
-		logger.Debug().Msg("Skipping evaluation because this review does not impact approval")
+		logger.Debug().Ctx(ctx).Msg("Skipping evaluation because this review does not impact approval")
 		return nil
 	}
 
