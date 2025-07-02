@@ -20,6 +20,7 @@ import (
 
 	"github.com/palantir/policy-bot/policy/common"
 	"github.com/palantir/policy-bot/pull"
+	"github.com/palantir/policy-bot/tracing"
 	"github.com/pkg/errors"
 )
 
@@ -76,7 +77,7 @@ type HasValidSignaturesBy struct {
 var _ Predicate = &HasValidSignaturesBy{}
 
 func (pred *HasValidSignaturesBy) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "HasValidSignaturesBy.Evaluate")
+	ctx, span := tracing.Tracer.Start(ctx, "HasValidSignaturesBy.Evaluate")
 	defer span.End()
 
 	commits, err := prctx.Commits()
@@ -145,7 +146,7 @@ type HasValidSignaturesByKeys struct {
 var _ Predicate = &HasValidSignaturesByKeys{}
 
 func (pred *HasValidSignaturesByKeys) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "HasValidSignaturesByKeys.Evaluate")
+	ctx, span := tracing.Tracer.Start(ctx, "HasValidSignaturesByKeys.Evaluate")
 	defer span.End()
 
 	commits, err := prctx.Commits()

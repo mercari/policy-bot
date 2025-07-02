@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/palantir/policy-bot/tracing"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/contrib/detectors/gcp"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
@@ -77,8 +78,9 @@ func SetupOpenTelemetry(ctx context.Context, logger zerolog.Logger, googleCloudS
 		sdktrace.WithBatcher(texporter),
 	)
 	shutdownFuncs = append(shutdownFuncs, tprovider.Shutdown)
-
 	otel.SetTracerProvider(tprovider)
+
+	tracing.Tracer = tprovider.Tracer("github.com/palantir/policy-bot")
 
 	return
 }

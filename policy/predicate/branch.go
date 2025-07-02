@@ -20,6 +20,7 @@ import (
 
 	"github.com/palantir/policy-bot/policy/common"
 	"github.com/palantir/policy-bot/pull"
+	"github.com/palantir/policy-bot/tracing"
 )
 
 type TargetsBranch struct {
@@ -29,7 +30,7 @@ type TargetsBranch struct {
 var _ Predicate = &TargetsBranch{}
 
 func (pred *TargetsBranch) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	_, span := tracer.Start(ctx, "TargetsBranch.Evaluate")
+	_, span := tracing.Tracer.Start(ctx, "TargetsBranch.Evaluate")
 	defer span.End()
 
 	targetName, _ := prctx.Branches()
@@ -63,7 +64,7 @@ type FromBranch struct {
 var _ Predicate = &FromBranch{}
 
 func (pred *FromBranch) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	_, span := tracer.Start(ctx, "FromBranch.Evaluate")
+	_, span := tracing.Tracer.Start(ctx, "FromBranch.Evaluate")
 	defer span.End()
 
 	_, sourceBranchName := prctx.Branches()

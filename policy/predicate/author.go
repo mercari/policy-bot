@@ -21,6 +21,7 @@ import (
 
 	"github.com/palantir/policy-bot/policy/common"
 	"github.com/palantir/policy-bot/pull"
+	"github.com/palantir/policy-bot/tracing"
 	"github.com/pkg/errors"
 )
 
@@ -31,7 +32,7 @@ type HasAuthorIn struct {
 var _ Predicate = &HasAuthorIn{}
 
 func (pred *HasAuthorIn) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "HasAuthorIn.Evaluate")
+	ctx, span := tracing.Tracer.Start(ctx, "HasAuthorIn.Evaluate")
 	defer span.End()
 
 	author := prctx.Author()
@@ -68,7 +69,7 @@ type OnlyHasContributorsIn struct {
 var _ Predicate = &OnlyHasContributorsIn{}
 
 func (pred *OnlyHasContributorsIn) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "OnlyHasContributorsIn.Evaluate")
+	ctx, span := tracing.Tracer.Start(ctx, "OnlyHasContributorsIn.Evaluate")
 	defer span.End()
 
 	commits, err := prctx.Commits()
@@ -130,7 +131,7 @@ type HasContributorIn struct {
 var _ Predicate = &HasContributorIn{}
 
 func (pred *HasContributorIn) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "HasContributorIn.Evaluate")
+	ctx, span := tracing.Tracer.Start(ctx, "HasContributorIn.Evaluate")
 	defer span.End()
 
 	commits, err := prctx.Commits()

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v72/github"
+	"github.com/palantir/policy-bot/tracing"
 	"github.com/pkg/errors"
 	"github.com/shurcooL/githubv4"
 )
@@ -198,7 +199,7 @@ func (ghc *GitHubContext) RepositoryName() string {
 }
 
 func (ghc *GitHubContext) RepositoryCustomProperties() (map[string]CustomProperty, error) {
-	_, span := tracer.Start(ghc.ctx, "GitHubContext.RepositoryCustomProperties")
+	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.RepositoryCustomProperties")
 	defer span.End()
 
 	if ghc.repoCustomProperties == nil {
@@ -211,7 +212,7 @@ func (ghc *GitHubContext) RepositoryCustomProperties() (map[string]CustomPropert
 }
 
 func (ghc *GitHubContext) loadRepositoryCustomProperties() error {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.loadRepositoryCustomProperties")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.loadRepositoryCustomProperties")
 	defer span.End()
 
 	values, _, err := ghc.client.Repositories.GetAllCustomPropertyValues(ctx, ghc.owner, ghc.repo)
@@ -253,7 +254,7 @@ type v4PullRequestWithEditedAt struct {
 }
 
 func (ghc *GitHubContext) Body() (*Body, error) {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.Body")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Body")
 	defer span.End()
 
 	var q struct {
@@ -316,7 +317,7 @@ func (ghc *GitHubContext) Branches() (base string, head string) {
 }
 
 func (ghc *GitHubContext) ChangedFiles() ([]*File, error) {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.ChangedFiles")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.ChangedFiles")
 	defer span.End()
 
 	// Check if changed files exceeds the limit
@@ -377,7 +378,7 @@ func (ghc *GitHubContext) ChangedFiles() ([]*File, error) {
 }
 
 func (ghc *GitHubContext) Commits() ([]*Commit, error) {
-	_, span := tracer.Start(ghc.ctx, "GitHubContext.Commits")
+	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Commits")
 	defer span.End()
 
 	if ghc.commits == nil {
@@ -394,7 +395,7 @@ func (ghc *GitHubContext) Commits() ([]*Commit, error) {
 }
 
 func (ghc *GitHubContext) PushedAt(sha string) (time.Time, error) {
-	_, span := tracer.Start(ghc.ctx, "GitHubContext.PushedAt")
+	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.PushedAt")
 	defer span.End()
 
 	repoID := ghc.pr.BaseRepository.DatabaseID
@@ -462,7 +463,7 @@ func (ghc *GitHubContext) PushedAt(sha string) (time.Time, error) {
 //
 // The local cache must be initialized before calling tryPushedAt.
 func (ghc *GitHubContext) tryPushedAt(repoID int64, sha string) (time.Time, error) {
-	_, span := tracer.Start(ghc.ctx, "GitHubContext.tryPushedAt")
+	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.tryPushedAt")
 	defer span.End()
 
 	if t, ok := ghc.pushedAt[sha]; ok {
@@ -481,7 +482,7 @@ func (ghc *GitHubContext) tryPushedAt(repoID int64, sha string) (time.Time, erro
 // is the head of the pull request. A child commit is a commit that has SHA as
 // a parent.
 func (ghc *GitHubContext) nextChildCommit(sha string) (*Commit, error) {
-	_, span := tracer.Start(ghc.ctx, "GitHubContext.nextChildCommit")
+	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.nextChildCommit")
 	defer span.End()
 
 	if sha == ghc.HeadSHA() {
@@ -505,7 +506,7 @@ func (ghc *GitHubContext) nextChildCommit(sha string) (*Commit, error) {
 }
 
 func (ghc *GitHubContext) Comments() ([]*Comment, error) {
-	_, span := tracer.Start(ghc.ctx, "GitHubContext.Comments")
+	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Comments")
 	defer span.End()
 
 	if ghc.comments == nil {
@@ -517,7 +518,7 @@ func (ghc *GitHubContext) Comments() ([]*Comment, error) {
 }
 
 func (ghc *GitHubContext) Reviews() ([]*Review, error) {
-	_, span := tracer.Start(ghc.ctx, "GitHubContext.Reviews")
+	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Reviews")
 	defer span.End()
 
 	if ghc.reviews == nil {
@@ -529,7 +530,7 @@ func (ghc *GitHubContext) Reviews() ([]*Review, error) {
 }
 
 func (ghc *GitHubContext) RepositoryCollaborators() ([]*Collaborator, error) {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.RepositoryCollaborators")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.RepositoryCollaborators")
 	defer span.End()
 
 	if ghc.collaborators == nil {
@@ -680,7 +681,7 @@ func (ghc *GitHubContext) RepositoryCollaborators() ([]*Collaborator, error) {
 }
 
 func (ghc *GitHubContext) CollaboratorPermission(user string) (Permission, error) {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.CollaboratorPermission")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.CollaboratorPermission")
 	defer span.End()
 
 	if ghc.permissions == nil {
@@ -744,7 +745,7 @@ func findUserIndex(user string, users []v4Actor) int {
 }
 
 func (ghc *GitHubContext) RequestedReviewers() ([]*Reviewer, error) {
-	_, span := tracer.Start(ghc.ctx, "GitHubContext.RequestedReviewers")
+	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.RequestedReviewers")
 	defer span.End()
 
 	if ghc.reviewers == nil {
@@ -756,7 +757,7 @@ func (ghc *GitHubContext) RequestedReviewers() ([]*Reviewer, error) {
 }
 
 func (ghc *GitHubContext) loadRequestedReviewers() error {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.loadRequestedReviewers")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.loadRequestedReviewers")
 	defer span.End()
 
 	var q struct {
@@ -820,7 +821,7 @@ func (ghc *GitHubContext) loadRequestedReviewers() error {
 }
 
 func (ghc *GitHubContext) Teams() (map[string]Permission, error) {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.Teams")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Teams")
 	defer span.End()
 
 	if ghc.teams == nil {
@@ -848,7 +849,7 @@ func (ghc *GitHubContext) Teams() (map[string]Permission, error) {
 }
 
 func (ghc *GitHubContext) LatestStatuses() (map[string]string, error) {
-	_, span := tracer.Start(ghc.ctx, "GitHubContext.LatestStatuses")
+	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.LatestStatuses")
 	defer span.End()
 
 	if ghc.statuses == nil {
@@ -873,7 +874,7 @@ func (ghc *GitHubContext) LatestStatuses() (map[string]string, error) {
 }
 
 func (ghc *GitHubContext) getStatuses() (map[string]string, error) {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.getStatuses")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.getStatuses")
 	defer span.End()
 
 	opt := &github.ListOptions{
@@ -898,7 +899,7 @@ func (ghc *GitHubContext) getStatuses() (map[string]string, error) {
 }
 
 func (ghc *GitHubContext) getCheckStatuses() (map[string]string, error) {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.getCheckStatuses")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.getCheckStatuses")
 	defer span.End()
 
 	opt := &github.ListCheckRunsOptions{
@@ -934,7 +935,7 @@ func (ghc *GitHubContext) getCheckStatuses() (map[string]string, error) {
 }
 
 func (ghc *GitHubContext) LatestWorkflowRuns() (map[string][]string, error) {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.LatestWorkflowRuns")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.LatestWorkflowRuns")
 	defer span.End()
 
 	if ghc.workflowRuns != nil {
@@ -1023,7 +1024,7 @@ func (ghc *GitHubContext) LatestWorkflowRuns() (map[string][]string, error) {
 }
 
 func (ghc *GitHubContext) Labels() ([]string, error) {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.Labels")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Labels")
 	defer span.End()
 
 	if ghc.labels == nil {
@@ -1045,7 +1046,7 @@ func (ghc *GitHubContext) Labels() ([]string, error) {
 }
 
 func (ghc *GitHubContext) loadPagedData() error {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.loadPagedData")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.loadPagedData")
 	defer span.End()
 
 	// this is a minor optimization: make max(c,r) requests instead of c+r
@@ -1112,7 +1113,7 @@ func (ghc *GitHubContext) loadPagedData() error {
 }
 
 func (ghc *GitHubContext) loadCommits() ([]*Commit, error) {
-	_, span := tracer.Start(ghc.ctx, "GitHubContext.loadCommits")
+	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.loadCommits")
 	defer span.End()
 
 	rawCommits, err := ghc.loadRawCommits()
@@ -1140,7 +1141,7 @@ func (ghc *GitHubContext) loadCommits() ([]*Commit, error) {
 }
 
 func (ghc *GitHubContext) loadRawCommits() ([]*v4PullRequestCommit, error) {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.loadRawCommits")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.loadRawCommits")
 	defer span.End()
 
 	var q struct {
@@ -1174,7 +1175,7 @@ func (ghc *GitHubContext) loadRawCommits() ([]*v4PullRequestCommit, error) {
 }
 
 func (ghc *GitHubContext) loadPushedAt(sha string) (time.Time, error) {
-	ctx, span := tracer.Start(ghc.ctx, "GitHubContext.loadPushedAt")
+	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.loadPushedAt")
 	defer span.End()
 
 	opt := &github.ListOptions{
