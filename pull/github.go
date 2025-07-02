@@ -499,6 +499,7 @@ func (ghc *GitHubContext) Reviews() ([]*Review, error) {
 }
 
 func (ghc *GitHubContext) RepositoryCollaborators() ([]*Collaborator, error) {
+
 	if ghc.collaborators == nil {
 		// For reviewer assignment, we need to figure out how each collaborator
 		// gets permissions on the repository. We _should_ be able to do this

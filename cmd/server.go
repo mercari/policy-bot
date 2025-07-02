@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 
@@ -67,7 +68,7 @@ func serverCmd(cmd *cobra.Command, args []string) error {
 		return errors.Wrapf(err, "failed to read server config")
 	}
 
-	s, err := server.New(cfg)
+	s, err := server.New(context.Background(), cfg)
 	if err != nil {
 		return err
 	}

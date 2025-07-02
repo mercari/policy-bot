@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -39,11 +41,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rcrowley/go-metrics"
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/contrib/propagators/autoprop"
-	"go.opentelemetry.io/otel"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"goji.io"
 	"goji.io/pat"
 )
@@ -60,13 +58,14 @@ const (
 )
 
 type Server struct {
-	config *Config
-	base   *baseapp.Server
+	config   *Config
+	shutdown func(context.Context) error
+	base     *baseapp.Server
 }
 
 // New instantiates a new Server.
 // Callers must then invoke Start to run the Server.
-func New(c *Config) (*Server, error) {
+func New(ctx context.Context, c *Config) (*Server, error) {
 	logger := baseapp.NewLogger(baseapp.LoggingConfig{
 		Level:  c.Logging.Level,
 		Pretty: c.Logging.Text,
@@ -161,7 +160,7 @@ func New(c *Config) (*Server, error) {
 		return nil, errors.Wrap(err, "failed to initialize Github app client")
 	}
 
-	app, _, err := appClient.Apps.Get(context.Background(), "")
+	app, _, err := appClient.Apps.Get(ctx, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get configured GitHub app")
 	}
@@ -240,13 +239,12 @@ func New(c *Config) (*Server, error) {
 		return nil, errors.Wrap(err, "failed to load templates")
 	}
 
+	var shutdown func(context.Context) error
 	if c.OpenTelemetry.Enabled {
-		otel.SetTextMapPropagator(autoprop.NewTextMapPropagator())
-		texporter, err := autoexport.NewSpanExporter(context.Background())
+		shutdown, err = policybototel.SetupOpenTelemetry(ctx, logger, c.OpenTelemetry.GoogleCloudSupport)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create OpenTelemetry exporter")
+			return nil, errors.Wrap(err, "failed to setup OpenTelemetry")
 		}
-		otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithBatcher(texporter)))
 	}
 
 	var mux *goji.Mux
@@ -306,17 +304,40 @@ func New(c *Config) (*Server, error) {
 	mux.Handle(pat.New("/details/*"), details)
 
 	return &Server{
-		config: c,
-		base:   base,
+		config:   c,
+		base:     base,
+		shutdown: shutdown,
 	}, nil
 }
 
 // Start is blocking and long-running
 func (s *Server) Start() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	if s.config.Datadog.Address != "" {
 		if err := datadog.StartEmitter(s.base, s.config.Datadog); err != nil {
 			return err
 		}
 	}
-	return s.base.Start()
+
+	var err error
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- s.base.Start()
+	}()
+
+	select {
+	case err = <-serverErr:
+		return err
+	case <-ctx.Done():
+		stop()
+	}
+
+	if s.shutdown != nil {
+		if err := s.shutdown(ctx); err != nil {
+			return errors.Wrap(err, "failed to shutdown OpenTelemetry")
+		}
+	}
+	return nil
 }
