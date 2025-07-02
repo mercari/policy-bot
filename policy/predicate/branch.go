@@ -29,6 +29,9 @@ type TargetsBranch struct {
 var _ Predicate = &TargetsBranch{}
 
 func (pred *TargetsBranch) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
+	ctx, span := tracer.Start(ctx, "TargetsBranch.Evaluate")
+	defer span.End()
+
 	targetName, _ := prctx.Branches()
 	matches := pred.Pattern.Matches(targetName)
 
@@ -60,6 +63,9 @@ type FromBranch struct {
 var _ Predicate = &FromBranch{}
 
 func (pred *FromBranch) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
+	ctx, span := tracer.Start(ctx, "FromBranch.Evaluate")
+	defer span.End()
+
 	_, sourceBranchName := prctx.Branches()
 	matches := pred.Pattern.Matches(sourceBranchName)
 
