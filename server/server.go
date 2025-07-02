@@ -71,7 +71,7 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 		Pretty: c.Logging.Text,
 	})
 	if c.OpenTelemetry.Enabled && c.OpenTelemetry.GoogleCloudSupport {
-		logger = logger.Hook(&policybototel.OtelZerologGoogleCloudHook{})
+		logger = logger.Hook(&policybototel.ZerologOtelGoogleCloudHook{})
 	}
 
 	lifetime, _ := time.ParseDuration(c.Sessions.Lifetime)

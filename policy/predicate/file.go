@@ -41,7 +41,7 @@ type ChangedFiles struct {
 var _ Predicate = &ChangedFiles{}
 
 func (pred *ChangedFiles) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "ChangedFiles.Evaluate")
+	_, span := tracer.Start(ctx, "ChangedFiles.Evaluate")
 	defer span.End()
 
 	paths := getPathStrings(pred.Paths)
@@ -96,7 +96,7 @@ type OnlyChangedFiles struct {
 var _ Predicate = &OnlyChangedFiles{}
 
 func (pred *OnlyChangedFiles) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "OnlyChangedFiles.Evaluate")
+	_, span := tracer.Start(ctx, "OnlyChangedFiles.Evaluate")
 	defer span.End()
 
 	paths := getPathStrings(pred.Paths)
@@ -194,7 +194,7 @@ type FileAdded struct {
 var _ Predicate = &FileAdded{}
 
 func (pred *FileAdded) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "FileAdded.Evaluate")
+	_, span := tracer.Start(ctx, "FileAdded.Evaluate")
 	defer span.End()
 
 	paths := getPathStrings(pred.Paths)
@@ -241,7 +241,7 @@ type FileNotAdded struct {
 var _ Predicate = &FileNotAdded{}
 
 func (pred *FileNotAdded) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "FileNotAdded.Evaluate")
+	_, span := tracer.Start(ctx, "FileNotAdded.Evaluate")
 	defer span.End()
 
 	paths := getPathStrings(pred.Paths)
@@ -290,7 +290,7 @@ type FileDeleted struct {
 var _ Predicate = &FileDeleted{}
 
 func (pred *FileDeleted) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "FileDeleted.Evaluate")
+	_, span := tracer.Start(ctx, "FileDeleted.Evaluate")
 	defer span.End()
 
 	paths := getPathStrings(pred.Paths)
@@ -338,7 +338,7 @@ type FileNotDeleted struct {
 var _ Predicate = &FileNotDeleted{}
 
 func (pred *FileNotDeleted) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "FileNotDeleted.Evaluate")
+	_, span := tracer.Start(ctx, "FileNotDeleted.Evaluate")
 	defer span.End()
 
 	paths := getPathStrings(pred.Paths)
@@ -477,7 +477,7 @@ func (exp *ComparisonExpr) UnmarshalText(text []byte) error {
 }
 
 func (pred *ModifiedLines) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracer.Start(ctx, "ModifiedLines.Evaluate")
+	_, span := tracer.Start(ctx, "ModifiedLines.Evaluate")
 	defer span.End()
 
 	files, err := prctx.ChangedFiles()
