@@ -119,7 +119,7 @@ func TestCommits(t *testing.T) {
 	rp := &ResponsePlayer{}
 	dataRule := rp.AddRule(
 		GraphQLNodePrefixMatcher("repository.pullRequest.commits"),
-		"testdata/responses/pull_commits.yml",
+		"testdata/responses/pull_reviews_comments.yml",
 	)
 
 	ctx := makeContext(t, rp, nil, nil)
@@ -160,7 +160,7 @@ func TestCommits(t *testing.T) {
 
 func TestReviews(t *testing.T) {
 	rp := &ResponsePlayer{}
-	dataRule := rp.AddRule(
+	reviewsRule := rp.AddRule(
 		GraphQLNodePrefixMatcher("repository.pullRequest.reviews"),
 		"testdata/responses/pull_reviews.yml",
 	)
@@ -171,7 +171,7 @@ func TestReviews(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, reviews, 3, "incorrect number of reviews")
-	assert.Equal(t, 2, dataRule.Count, "no http request was made")
+	assert.Equal(t, 2, reviewsRule.Count, "no http request was made")
 
 	expectedTime, err := time.Parse(time.RFC3339, "2018-06-27T20:33:26Z")
 	assert.NoError(t, err)
@@ -199,13 +199,13 @@ func TestReviews(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, reviews, 3, "incorrect number of reviews")
-	assert.Equal(t, 2, dataRule.Count, "cached reviews were not used")
+	assert.Equal(t, 2, reviewsRule.Count, "cached reviews were not used")
 }
 
 func TestNoReviews(t *testing.T) {
 	rp := &ResponsePlayer{}
 	dataRule := rp.AddRule(
-		GraphQLNodePrefixMatcher("repository.pullRequest.reviews"),
+		GraphQLNodePrefixMatcher("repository.pullRequest.commits"),
 		"testdata/responses/pull_no_reviews.yml",
 	)
 
@@ -560,7 +560,7 @@ func TestPushedAt(t *testing.T) {
 	rp := &ResponsePlayer{}
 	commitsRule := rp.AddRule(
 		GraphQLNodePrefixMatcher("repository.pullRequest.commits"),
-		"testdata/responses/pull_commits.yml",
+		"testdata/responses/pull_reviews_comments.yml",
 	)
 	statusRuleA6F := rp.AddRule(
 		ExactPathMatcher("/repos/testorg/testrepo/commits/a6f3f69b64eaafece5a0d854eb4af11c0d64394c/statuses"),
