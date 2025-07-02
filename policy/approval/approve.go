@@ -26,6 +26,8 @@ import (
 	"github.com/palantir/policy-bot/pull"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Rule struct {
@@ -110,6 +112,11 @@ func (r *Rule) Trigger() common.Trigger {
 }
 
 func (r *Rule) Evaluate(ctx context.Context, prctx pull.Context) (res common.Result) {
+	ctx, span := tracer.Start(ctx, "policy.approval.Rule.Evaluate", trace.WithAttributes(
+		attribute.String("rule.name", r.Name),
+	))
+	defer span.End()
+
 	log := zerolog.Ctx(ctx)
 
 	res.Name = r.Name
