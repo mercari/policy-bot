@@ -36,7 +36,7 @@ func SetupOpenTelemetry(ctx context.Context, logger zerolog.Logger, googleCloudS
 	resOpts := []resource.Option{
 		resource.WithTelemetrySDK(),
 		resource.WithAttributes(
-			semconv.ServiceNameKey.String("policy-bot"),
+			semconv.ServiceName("policy-bot"),
 		),
 	}
 	if googleCloudSupport {
