@@ -50,14 +50,21 @@ func SetupOpenTelemetry(ctx context.Context, logger zerolog.Logger, googleCloudS
 	}
 
 	otel.SetTextMapPropagator(autoprop.NewTextMapPropagator())
+
 	texporter, err := autoexport.NewSpanExporter(context.Background())
 	if err != nil {
 		handleErr(fmt.Errorf("failed to create OpenTelemetry exporter: %w", err))
 		return
 	}
-	otel.SetTracerProvider(sdktrace.NewTracerProvider(
+	shutdownFuncs = append(shutdownFuncs, texporter.Shutdown)
+
+	tprovider := sdktrace.NewTracerProvider(
 		sdktrace.WithResource(res),
 		sdktrace.WithBatcher(texporter),
-	))
+	)
+	shutdownFuncs = append(shutdownFuncs, tprovider.Shutdown)
+
+	otel.SetTracerProvider(tprovider)
+
 	return
 }

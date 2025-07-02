@@ -312,7 +312,7 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 
 // Start is blocking and long-running
 func (s *Server) Start() error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer stop()
 
 	if s.config.Datadog.Address != "" {
@@ -324,7 +324,10 @@ func (s *Server) Start() error {
 	var err error
 	serverErr := make(chan error, 1)
 	go func() {
-		serverErr <- s.base.Start()
+		defer close(serverErr)
+		if err := s.base.Start(); err != nil {
+			serverErr <- err
+		}
 	}()
 
 	select {
@@ -335,7 +338,7 @@ func (s *Server) Start() error {
 	}
 
 	if s.shutdown != nil {
-		if err := s.shutdown(ctx); err != nil {
+		if err := s.shutdown(context.Background()); err != nil {
 			return errors.Wrap(err, "failed to shutdown OpenTelemetry")
 		}
 	}
