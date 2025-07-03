@@ -160,7 +160,7 @@ func TestCommits(t *testing.T) {
 
 func TestReviews(t *testing.T) {
 	rp := &ResponsePlayer{}
-	reviewsRule := rp.AddRule(
+	dataRule := rp.AddRule(
 		GraphQLNodePrefixMatcher("repository.pullRequest.reviews"),
 		"testdata/responses/pull_reviews.yml",
 	)
@@ -171,7 +171,7 @@ func TestReviews(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, reviews, 3, "incorrect number of reviews")
-	assert.Equal(t, 2, reviewsRule.Count, "no http request was made")
+	assert.Equal(t, 2, dataRule.Count, "no http request was made")
 
 	expectedTime, err := time.Parse(time.RFC3339, "2018-06-27T20:33:26Z")
 	assert.NoError(t, err)
@@ -199,7 +199,7 @@ func TestReviews(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, reviews, 3, "incorrect number of reviews")
-	assert.Equal(t, 2, reviewsRule.Count, "cached reviews were not used")
+	assert.Equal(t, 2, dataRule.Count, "cached reviews were not used")
 }
 
 func TestNoReviews(t *testing.T) {
