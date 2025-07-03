@@ -22,6 +22,7 @@ import (
 
 	"github.com/palantir/policy-bot/policy/common"
 	"github.com/palantir/policy-bot/pull"
+	"github.com/palantir/policy-bot/tracing"
 	"github.com/pkg/errors"
 )
 
@@ -41,6 +42,9 @@ type ChangedFiles struct {
 var _ Predicate = &ChangedFiles{}
 
 func (pred *ChangedFiles) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
+	_, span := tracing.Tracer.Start(ctx, "ChangedFiles.Evaluate")
+	defer span.End()
+
 	paths := getPathStrings(pred.Paths)
 	ignorePaths := getPathStrings(pred.IgnorePaths)
 
@@ -93,6 +97,9 @@ type OnlyChangedFiles struct {
 var _ Predicate = &OnlyChangedFiles{}
 
 func (pred *OnlyChangedFiles) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
+	_, span := tracing.Tracer.Start(ctx, "OnlyChangedFiles.Evaluate")
+	defer span.End()
+
 	paths := getPathStrings(pred.Paths)
 
 	predicateResult := common.PredicateResult{
@@ -146,6 +153,9 @@ type NoChangedFiles struct {
 var _ Predicate = &NoChangedFiles{}
 
 func (pred *NoChangedFiles) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
+	ctx, span := tracing.Tracer.Start(ctx, "NoChangedFiles.Evaluate")
+	defer span.End()
+
 	changedFiles := ChangedFiles{
 		Paths:       pred.Paths,
 		IgnorePaths: pred.IgnorePaths,
@@ -185,6 +195,9 @@ type FileAdded struct {
 var _ Predicate = &FileAdded{}
 
 func (pred *FileAdded) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
+	_, span := tracing.Tracer.Start(ctx, "FileAdded.Evaluate")
+	defer span.End()
+
 	paths := getPathStrings(pred.Paths)
 	predicateResult := common.PredicateResult{
 		Satisfied:       false,
@@ -229,6 +242,9 @@ type FileNotAdded struct {
 var _ Predicate = &FileNotAdded{}
 
 func (pred *FileNotAdded) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
+	_, span := tracing.Tracer.Start(ctx, "FileNotAdded.Evaluate")
+	defer span.End()
+
 	paths := getPathStrings(pred.Paths)
 
 	predicateResult := common.PredicateResult{
@@ -275,6 +291,9 @@ type FileDeleted struct {
 var _ Predicate = &FileDeleted{}
 
 func (pred *FileDeleted) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
+	_, span := tracing.Tracer.Start(ctx, "FileDeleted.Evaluate")
+	defer span.End()
+
 	paths := getPathStrings(pred.Paths)
 
 	predicateResult := common.PredicateResult{
@@ -320,6 +339,9 @@ type FileNotDeleted struct {
 var _ Predicate = &FileNotDeleted{}
 
 func (pred *FileNotDeleted) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
+	_, span := tracing.Tracer.Start(ctx, "FileNotDeleted.Evaluate")
+	defer span.End()
+
 	paths := getPathStrings(pred.Paths)
 	predicateResult := common.PredicateResult{
 		Satisfied:         true,
@@ -456,6 +478,9 @@ func (exp *ComparisonExpr) UnmarshalText(text []byte) error {
 }
 
 func (pred *ModifiedLines) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
+	_, span := tracing.Tracer.Start(ctx, "ModifiedLines.Evaluate")
+	defer span.End()
+
 	files, err := prctx.ChangedFiles()
 
 	predicateResult := common.PredicateResult{

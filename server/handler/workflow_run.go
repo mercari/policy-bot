@@ -62,7 +62,7 @@ func (h *WorkflowRun) Handle(ctx context.Context, eventType, deliveryID string, 
 		// do with us.
 		prBaseRepo := pr.GetBase().GetRepo()
 		if prBaseRepo.GetID() != repoID {
-			logger.Debug().Msgf("Skipping pull request '%d' from different repository '%s'", pr.GetNumber(), prBaseRepo.GetURL())
+			logger.Debug().Ctx(ctx).Msgf("Skipping pull request '%d' from different repository '%s'", pr.GetNumber(), prBaseRepo.GetURL())
 			continue
 		}
 
@@ -73,7 +73,7 @@ func (h *WorkflowRun) Handle(ctx context.Context, eventType, deliveryID string, 
 			Value:  pr,
 		}); err != nil {
 			evaluationFailures++
-			logger.Error().Err(err).Msgf("Failed to evaluate pull request '%d' for SHA '%s'", pr.GetNumber(), commitSHA)
+			logger.Error().Ctx(ctx).Err(err).Msgf("Failed to evaluate pull request '%d' for SHA '%s'", pr.GetNumber(), commitSHA)
 		}
 	}
 	if evaluationFailures == 0 {

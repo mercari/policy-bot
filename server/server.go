@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -34,9 +36,12 @@ import (
 	"github.com/palantir/go-githubapp/oauth2"
 	"github.com/palantir/policy-bot/pull"
 	"github.com/palantir/policy-bot/server/handler"
+	policybototel "github.com/palantir/policy-bot/server/otel"
 	"github.com/palantir/policy-bot/version"
 	"github.com/pkg/errors"
+	"github.com/rcrowley/go-metrics"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"goji.io"
 	"goji.io/pat"
 )
@@ -53,17 +58,21 @@ const (
 )
 
 type Server struct {
-	config *Config
-	base   *baseapp.Server
+	config   *Config
+	shutdown func(context.Context) error
+	base     *baseapp.Server
 }
 
 // New instantiates a new Server.
 // Callers must then invoke Start to run the Server.
-func New(c *Config) (*Server, error) {
+func New(ctx context.Context, c *Config) (*Server, error) {
 	logger := baseapp.NewLogger(baseapp.LoggingConfig{
 		Level:  c.Logging.Level,
 		Pretty: c.Logging.Text,
 	})
+	if c.OpenTelemetry.Enabled && c.OpenTelemetry.GoogleCloudSupport {
+		logger = logger.Hook(&policybototel.ZerologOtelGoogleCloudHook{})
+	}
 
 	lifetime, _ := time.ParseDuration(c.Sessions.Lifetime)
 	if lifetime == 0 {
@@ -88,7 +97,19 @@ func New(c *Config) (*Server, error) {
 	sessions.HttpOnly(true)
 	sessions.Secure(forceTLS)
 
-	base, err := baseapp.NewServer(c.Server, baseapp.DefaultParams(logger, "policybot.")...)
+	params := baseapp.DefaultParams(logger, "policybot.")
+	if c.OpenTelemetry.Enabled {
+		// WithMiddleware overwrites the middleware stack, so we have to generate the default and prepend to it
+		middlewares := append(
+			[]func(http.Handler) http.Handler{
+				func(h http.Handler) http.Handler { return otelhttp.NewHandler(h, "policy-bot") },
+			},
+			baseapp.DefaultMiddleware(logger, metrics.NewPrefixedRegistry("policybot."))...,
+		)
+		params = append(params, baseapp.WithMiddleware(middlewares...))
+	}
+
+	base, err := baseapp.NewServer(c.Server, params...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize base server")
 	}
@@ -108,9 +129,15 @@ func New(c *Config) (*Server, error) {
 		return nil, errors.Wrap(err, "invalid v4 API URL")
 	}
 
+	transport := http.DefaultTransport
+	if c.OpenTelemetry.Enabled {
+		transport = otelhttp.NewTransport(transport)
+	}
+
 	userAgent := fmt.Sprintf("policy-bot/%s", version.GetVersion())
 	cc, err := githubapp.NewDefaultCachingClientCreator(
 		c.Github,
+		githubapp.WithTransport(transport),
 		githubapp.WithClientUserAgent(userAgent),
 		githubapp.WithClientTimeout(githubTimeout),
 		githubapp.WithClientCaching(true, func() httpcache.Cache {
@@ -133,7 +160,7 @@ func New(c *Config) (*Server, error) {
 		return nil, errors.Wrap(err, "failed to initialize Github app client")
 	}
 
-	app, _, err := appClient.Apps.Get(context.Background(), "")
+	app, _, err := appClient.Apps.Get(ctx, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get configured GitHub app")
 	}
@@ -212,6 +239,14 @@ func New(c *Config) (*Server, error) {
 		return nil, errors.Wrap(err, "failed to load templates")
 	}
 
+	var shutdown func(context.Context) error
+	if c.OpenTelemetry.Enabled {
+		shutdown, err = policybototel.SetupOpenTelemetry(ctx, logger, c.OpenTelemetry.GoogleCloudSupport)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to setup OpenTelemetry")
+		}
+	}
+
 	var mux *goji.Mux
 	if basePath == "" {
 		mux = base.Mux()
@@ -269,17 +304,43 @@ func New(c *Config) (*Server, error) {
 	mux.Handle(pat.New("/details/*"), details)
 
 	return &Server{
-		config: c,
-		base:   base,
+		config:   c,
+		base:     base,
+		shutdown: shutdown,
 	}, nil
 }
 
 // Start is blocking and long-running
 func (s *Server) Start() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	defer stop()
+
 	if s.config.Datadog.Address != "" {
 		if err := datadog.StartEmitter(s.base, s.config.Datadog); err != nil {
 			return err
 		}
 	}
-	return s.base.Start()
+
+	var err error
+	serverErr := make(chan error, 1)
+	go func() {
+		defer close(serverErr)
+		if err := s.base.Start(); err != nil {
+			serverErr <- err
+		}
+	}()
+
+	select {
+	case err = <-serverErr:
+		return err
+	case <-ctx.Done():
+		stop()
+	}
+
+	if s.shutdown != nil {
+		if err := s.shutdown(context.Background()); err != nil {
+			return errors.Wrap(err, "failed to shutdown OpenTelemetry")
+		}
+	}
+	return nil
 }
