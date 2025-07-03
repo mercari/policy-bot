@@ -21,13 +21,16 @@ import (
 
 	"github.com/palantir/policy-bot/tracing"
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/contrib/detectors/gcp"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/contrib/propagators/autoprop"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/oauth"
 )
 
 func SetupOpenTelemetry(ctx context.Context, logger zerolog.Logger, googleCloudSupport bool) (shutdown func(context.Context) error, err error) {
@@ -54,9 +57,6 @@ func SetupOpenTelemetry(ctx context.Context, logger zerolog.Logger, googleCloudS
 			semconv.ServiceName("policy-bot"),
 		),
 	}
-	if googleCloudSupport {
-		resOpts = append(resOpts, resource.WithDetectors(gcp.NewDetector()))
-	}
 
 	res, err := resource.New(ctx, resOpts...)
 	if err != nil {
@@ -66,10 +66,26 @@ func SetupOpenTelemetry(ctx context.Context, logger zerolog.Logger, googleCloudS
 
 	otel.SetTextMapPropagator(autoprop.NewTextMapPropagator())
 
-	texporter, err := autoexport.NewSpanExporter(context.Background())
-	if err != nil {
-		handleErr(fmt.Errorf("failed to create OpenTelemetry exporter: %w", err))
-		return
+	var texporter sdktrace.SpanExporter
+	if googleCloudSupport {
+		var creds credentials.PerRPCCredentials
+		creds, err = oauth.NewApplicationDefault(ctx)
+		if err != nil {
+			handleErr(fmt.Errorf("failed to create Google Cloud credentials: %w", err))
+			return
+		}
+
+		texporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithDialOption(grpc.WithPerRPCCredentials(creds)))
+		if err != nil {
+			handleErr(fmt.Errorf("failed to create OpenTelemetry exporter: %w", err))
+			return
+		}
+	} else {
+		texporter, err = autoexport.NewSpanExporter(context.Background())
+		if err != nil {
+			handleErr(fmt.Errorf("failed to create OpenTelemetry exporter: %w", err))
+			return
+		}
 	}
 	shutdownFuncs = append(shutdownFuncs, texporter.Shutdown)
 
