@@ -92,6 +92,7 @@ func SetupOpenTelemetry(ctx context.Context, logger zerolog.Logger, googleCloudS
 	tprovider := sdktrace.NewTracerProvider(
 		sdktrace.WithResource(res),
 		sdktrace.WithBatcher(texporter),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 	shutdownFuncs = append(shutdownFuncs, tprovider.Shutdown)
 	otel.SetTracerProvider(tprovider)
