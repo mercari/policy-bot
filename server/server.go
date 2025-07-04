@@ -100,13 +100,17 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 	params := baseapp.DefaultParams(logger, "policybot.")
 	if c.OpenTelemetry.Enabled {
 		// WithMiddleware overwrites the middleware stack, so we have to generate the default and prepend to it
+		// Also we need to create a new metrics registry to ensure that the same registry is used everywhere
+		registry := metrics.NewPrefixedRegistry("policybot.")
 		middlewares := append(
 			[]func(http.Handler) http.Handler{
 				func(h http.Handler) http.Handler { return otelhttp.NewHandler(h, "policy-bot") },
 			},
-			baseapp.DefaultMiddleware(logger, metrics.NewPrefixedRegistry("policybot."))...,
+			baseapp.DefaultMiddleware(logger, registry)...,
 		)
-		params = append(params, baseapp.WithMiddleware(middlewares...))
+		params = append(params,
+			baseapp.WithRegistry(registry),
+			baseapp.WithMiddleware(middlewares...))
 	}
 
 	base, err := baseapp.NewServer(c.Server, params...)
