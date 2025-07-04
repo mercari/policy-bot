@@ -224,14 +224,14 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 
 	dispatcher := githubapp.NewEventDispatcher(
 		[]githubapp.EventHandler{
-			&handler.Installation{Base: basePolicyHandler},
-			&handler.MergeGroup{Base: basePolicyHandler},
-			&handler.PullRequest{Base: basePolicyHandler},
-			&handler.PullRequestReview{Base: basePolicyHandler},
-			&handler.IssueComment{Base: basePolicyHandler},
-			&handler.Status{Base: basePolicyHandler},
-			&handler.CheckRun{Base: basePolicyHandler},
-			&handler.WorkflowRun{Base: basePolicyHandler},
+			policybototel.Trace(&handler.Installation{Base: basePolicyHandler}),
+			policybototel.Trace(&handler.MergeGroup{Base: basePolicyHandler}),
+			policybototel.Trace(&handler.PullRequest{Base: basePolicyHandler}),
+			policybototel.Trace(&handler.PullRequestReview{Base: basePolicyHandler}),
+			policybototel.Trace(&handler.IssueComment{Base: basePolicyHandler}),
+			policybototel.Trace(&handler.Status{Base: basePolicyHandler}),
+			policybototel.Trace(&handler.CheckRun{Base: basePolicyHandler}),
+			policybototel.Trace(&handler.WorkflowRun{Base: basePolicyHandler}),
 		},
 		c.Github.App.WebhookSecret,
 		githubapp.WithErrorCallback(githubapp.MetricsErrorCallback(base.Registry())),
