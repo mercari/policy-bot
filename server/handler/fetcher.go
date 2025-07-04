@@ -17,8 +17,10 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v72/github"
@@ -39,8 +41,111 @@ type FetchedConfig struct {
 	Path   string
 }
 
+type ConfigCache struct {
+	mu     sync.RWMutex
+	expiry time.Time
+	config *FetchedConfig
+}
+
+func (cc *ConfigCache) GetOrUpdate(fn func() (*FetchedConfig, error)) (*FetchedConfig, bool, error) {
+	const cacheUpdateTimeout = 30 * time.Second
+	const cacheExpiryDuration = 1 * time.Minute
+
+	// Works both when the cache has not expired, and when another process is currently updating the cache (block on RLock).
+	cached := func() *FetchedConfig {
+		cc.mu.RLock()
+		defer cc.mu.RUnlock()
+
+		if time.Now().Before(cc.expiry) {
+			return cc.config
+		} else {
+			return nil
+		}
+	}()
+	if cached != nil {
+		return cached, true, nil
+	}
+
+	// Update
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), cacheUpdateTimeout)
+	defer cancel()
+
+	var value *FetchedConfig
+	var err error
+	var updateDone = make(chan struct{}, 1)
+	go func() {
+		defer close(updateDone)
+		value, err = fn()
+	}()
+
+	select {
+	case <-timeoutCtx.Done():
+		return nil, false, errors.New("cache update timed out")
+	case <-updateDone:
+		if err != nil {
+			return nil, false, err
+		}
+		cc.config = value
+		cc.expiry = time.Now().Add(cacheExpiryDuration)
+		return cc.config, false, nil
+	}
+}
+
 type ConfigFetcher struct {
-	Loader *appconfig.Loader
+	sharedConfigCache ConfigCache
+
+	Options PullEvaluationOptions
+	Loader  *appconfig.Loader
+}
+
+func (cf *ConfigFetcher) configForSharedRepository(ctx context.Context, client *github.Client, owner string) (*FetchedConfig, error) {
+	r, _, err := client.Repositories.Get(ctx, owner, *cf.Options.SharedRepository)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repository %s/%s: %w", owner, *cf.Options.SharedRepository, err)
+	}
+
+	ref := r.GetDefaultBranch()
+	file, _, _, err := client.Repositories.GetContents(ctx, owner, *cf.Options.SharedRepository, *cf.Options.SharedPolicyPath, &github.RepositoryContentGetOptions{
+		Ref: ref,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file %s/%s@%s:%s: %w", owner, *cf.Options.SharedRepository, ref, *cf.Options.SharedPolicyPath, err)
+	}
+
+	content, err := file.GetContent()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get content of file %s/%s@%s:%s: %w", owner, *cf.Options.SharedRepository, ref, *cf.Options.SharedPolicyPath, err)
+	}
+
+	var pc policy.Config
+	if err := yaml.UnmarshalStrict([]byte(content), &pc); err != nil {
+		return nil, fmt.Errorf("failed to parse content of file %s/%s@%s:%s: %w", owner, *cf.Options.SharedRepository, ref, *cf.Options.SharedPolicyPath, err)
+	}
+
+	fc := &FetchedConfig{
+		Config: &pc,
+		Source: fmt.Sprintf("%s/%s@%s", owner, *cf.Options.SharedRepository, ref),
+		Path:   *cf.Options.SharedPolicyPath,
+	}
+	return fc, nil
+}
+
+func (cf *ConfigFetcher) ConfigForSharedRepository(ctx context.Context, client *github.Client, owner string) FetchedConfig {
+	ctx, span := tracing.Tracer.Start(ctx, "ConfigFetcher.ConfigForSharedRepository")
+	defer span.End()
+
+	config, cached, err := cf.sharedConfigCache.GetOrUpdate(func() (*FetchedConfig, error) {
+		return cf.configForSharedRepository(ctx, client, owner)
+	})
+	span.SetAttributes(attribute.Bool("cache.hit", cached))
+
+	if err != nil {
+		return FetchedConfig{LoadError: err}
+	}
+	return *config
 }
 
 func (cf *ConfigFetcher) ConfigForRepositoryBranch(ctx context.Context, client *github.Client, owner, repository, branch string) FetchedConfig {
@@ -51,6 +156,10 @@ func (cf *ConfigFetcher) ConfigForRepositoryBranch(ctx context.Context, client *
 			attribute.String("branch", branch),
 		))
 	defer span.End()
+
+	if cf.Options.ForceSharedPolicy {
+		return cf.ConfigForSharedRepository(ctx, client, owner)
+	}
 
 	retries := 0
 	delay := 1 * time.Second
