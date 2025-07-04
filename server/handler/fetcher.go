@@ -58,9 +58,8 @@ func (cc *ConfigCache) GetOrUpdate(fn func() (*FetchedConfig, error)) (*FetchedC
 
 		if time.Now().Before(cc.expiry) {
 			return cc.config
-		} else {
-			return nil
 		}
+		return nil
 	}()
 	if cached != nil {
 		return cached, true, nil
