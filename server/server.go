@@ -104,7 +104,13 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 		registry := metrics.NewPrefixedRegistry("policybot.")
 		middlewares := append(
 			[]func(http.Handler) http.Handler{
-				func(h http.Handler) http.Handler { return otelhttp.NewHandler(h, "policy-bot") },
+				func(h http.Handler) http.Handler {
+					return otelhttp.NewHandler(h, "policy-bot", otelhttp.WithFilter(func(r *http.Request) bool {
+						skip := r.URL.Path == "/" || r.URL.Path == "/api/github/hook" ||
+							strings.HasPrefix(r.URL.Path, "/static")
+						return !skip
+					}))
+				},
 			},
 			baseapp.DefaultMiddleware(logger, registry)...,
 		)
