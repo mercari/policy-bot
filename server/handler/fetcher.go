@@ -24,6 +24,9 @@ import (
 	"github.com/google/go-github/v72/github"
 	"github.com/palantir/go-githubapp/appconfig"
 	"github.com/palantir/policy-bot/policy"
+	"github.com/palantir/policy-bot/tracing"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v2"
 )
 
@@ -41,6 +44,14 @@ type ConfigFetcher struct {
 }
 
 func (cf *ConfigFetcher) ConfigForRepositoryBranch(ctx context.Context, client *github.Client, owner, repository, branch string) FetchedConfig {
+	ctx, span := tracing.Tracer.Start(ctx, "ConfigFetcher.ConfigForRepositoryBranch",
+		trace.WithAttributes(
+			attribute.String("owner", owner),
+			attribute.String("repository", repository),
+			attribute.String("branch", branch),
+		))
+	defer span.End()
+
 	retries := 0
 	delay := 1 * time.Second
 	for {
