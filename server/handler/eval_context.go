@@ -190,10 +190,17 @@ func (ec *EvalContext) PostStatus(ctx context.Context, state, message string) {
 		context = ec.Options.StatusCheckContext
 	}
 
+	var description string
+	if ec.Options.StatusCheckDescriptionPrefix != "" {
+		description = fmt.Sprintf("%s %s", ec.Options.StatusCheckDescriptionPrefix, message)
+	} else {
+		description = message
+	}
+
 	status := github.RepoStatus{
 		State:       &state,
 		Context:     github.Ptr(context),
-		Description: &message,
+		Description: &description,
 		TargetURL:   &detailsURL,
 	}
 
