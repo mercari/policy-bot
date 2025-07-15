@@ -43,6 +43,9 @@ type PullEvaluationOptions struct {
 	// pattern: <StatusCheckContext>
 	StatusCheckContextIgnoreBase bool `yaml:"status_check_context_ignore_base"`
 
+	// StatusCheckDescriptionPrefix will be used to prefix the status check description, with a space inserted.
+	StatusCheckDescriptionPrefix string `yaml:"status_check_description_prefix"`
+
 	// ExpandRequiredReviewers enables a UI feature where the details page
 	// shows a list of the users who can approve each rule. Enabling this
 	// feature can leak information about team membership and permissions that
