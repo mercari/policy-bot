@@ -190,9 +190,23 @@ func (ec *EvalContext) PostStatus(ctx context.Context, state, message string) {
 		context = ec.Options.StatusCheckContext
 	}
 
+	var prefix string
+	switch state {
+	case "success":
+		prefix = ec.Options.StatusCheckDescriptionPrefix.Success
+	case "pending":
+		prefix = ec.Options.StatusCheckDescriptionPrefix.Pending
+	case "failure":
+		prefix = ec.Options.StatusCheckDescriptionPrefix.Failure
+	case "error":
+		prefix = ec.Options.StatusCheckDescriptionPrefix.Error
+	default:
+		logger.Warn().Ctx(ctx).Msgf("Unknown status state: %s, using empty prefix", state)
+	}
+
 	var description string
-	if ec.Options.StatusCheckDescriptionPrefix != "" {
-		description = fmt.Sprintf("%s %s", ec.Options.StatusCheckDescriptionPrefix, message)
+	if prefix != "" {
+		description = fmt.Sprintf("%s %s", prefix, message)
 	} else {
 		description = message
 	}

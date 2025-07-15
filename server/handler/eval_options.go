@@ -26,6 +26,17 @@ const (
 	DefaultStatusCheckContext = "policy-bot"
 )
 
+type DescriptionPrefix struct {
+	// Approved
+	Success string `yaml:"success"`
+	// Pending
+	Pending string `yaml:"pending"`
+	// Disapproved
+	Failure string `yaml:"failure"`
+	// Skipped / Error
+	Error string `yaml:"error"`
+}
+
 type PullEvaluationOptions struct {
 	PolicyPath string `yaml:"policy_path"`
 
@@ -44,7 +55,7 @@ type PullEvaluationOptions struct {
 	StatusCheckContextIgnoreBase bool `yaml:"status_check_context_ignore_base"`
 
 	// StatusCheckDescriptionPrefix will be used to prefix the status check description, with a space inserted.
-	StatusCheckDescriptionPrefix string `yaml:"status_check_description_prefix"`
+	StatusCheckDescriptionPrefix DescriptionPrefix `yaml:"status_check_description_prefix"`
 
 	// ExpandRequiredReviewers enables a UI feature where the details page
 	// shows a list of the users who can approve each rule. Enabling this
