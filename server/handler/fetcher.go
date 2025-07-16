@@ -101,12 +101,18 @@ type ConfigFetcher struct {
 }
 
 func (cf *ConfigFetcher) configForSharedRepository(ctx context.Context, client *github.Client, owner string) (*FetchedConfig, error) {
-	r, _, err := client.Repositories.Get(ctx, owner, *cf.Options.SharedRepository)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get repository %s/%s: %w", owner, *cf.Options.SharedRepository, err)
+	var ref string
+	if cf.Options.SharedPolicyBranch != nil {
+		ref = *cf.Options.SharedPolicyBranch
+	} else {
+		r, _, err := client.Repositories.Get(ctx, owner, *cf.Options.SharedRepository)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get repository %s/%s: %w", owner, *cf.Options.SharedRepository, err)
+		}
+
+		ref = r.GetDefaultBranch()
 	}
 
-	ref := r.GetDefaultBranch()
 	file, _, _, err := client.Repositories.GetContents(ctx, owner, *cf.Options.SharedRepository, *cf.Options.SharedPolicyPath, &github.RepositoryContentGetOptions{
 		Ref: ref,
 	})
