@@ -107,12 +107,22 @@ sessions:
 #   # POLICYBOT_OPTIONS_POLICY_PATH environment variable.
 #   policy_path: .policy.yml
 #
+#   # Force using a shared policy file from the organization repository
+#   # instead of the policy file in the repository. Can also be set by the
+#   # POLICYBOT_OPTIONS_FORCE_SHARED_POLICY environment variable.
+#   force_shared_policy: false
+#
 #   # The name of an organization repository to look in for a shared policy if
 #   # a repository does not define a policy file. Can also be set by the
 #   # POLICYBOT_OPTIONS_SHARED_REPOSITORY environment variable. Explicitly set
 #   # this or `shared_policy_path` to an empty string(`""`) to disable searching
 #   # in a shared repository.
 #   shared_repository: .github
+#
+#   # The branch in the shared organization repository to look in for a shared
+#   # policy file. Can also be set by the POLICYBOT_OPTIONS_SHARED_POLICY_BRANCH environment variable.
+#   # If not set, the default branch of the repository is used.
+#   shared_policy_branch: ""
 #
 #   # The path to the policy file in the shared organization repository.
 #   # Can also be set by the POLICYBOT_OPTIONS_SHARED_POLICY_PATH environment variable.
@@ -121,6 +131,9 @@ sessions:
 #   # The context prefix for status checks created by the bot. Can also be set by the
 #   # POLICYBOT_OPTIONS_STATUS_CHECK_CONTEXT environment variable.
 #   status_check_context: policy-bot
+#
+#   # If true, the bot removes the base branch from the status check context.
+#   status_check_context_ignore_base: true
 #
 #   # If true, expand teams, organizations, and permissions in the detils UI to
 #   # a list of users. This option has security implications; see the README.
@@ -138,3 +151,9 @@ sessions:
 # files:
 #   static: build/static
 #   templates: server/templates
+
+# Options for OpenTelemetry tracing.
+#
+# opentelemetry:
+#   enabled: true
+#   google_cloud_support: true

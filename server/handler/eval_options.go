@@ -40,8 +40,9 @@ type DescriptionPrefix struct {
 type PullEvaluationOptions struct {
 	PolicyPath string `yaml:"policy_path"`
 
-	SharedRepository *string `yaml:"shared_repository"`
-	SharedPolicyPath *string `yaml:"shared_policy_path"`
+	SharedRepository   *string `yaml:"shared_repository"`
+	SharedPolicyBranch *string `yaml:"shared_policy_branch"`
+	SharedPolicyPath   *string `yaml:"shared_policy_path"`
 
 	// Ignore PolicyPath and use SharedRepository and SharedPolicyPath only.
 	ForceSharedPolicy bool `yaml:"force_shared_policy"`
