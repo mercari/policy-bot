@@ -183,12 +183,7 @@ func (ec *EvalContext) PostStatus(ctx context.Context, state, message string) {
 	publicURL := strings.TrimSuffix(ec.PublicURL, "/")
 	detailsURL := fmt.Sprintf("%s/details/%s/%s/%d", publicURL, owner, repo, ec.PullContext.Number())
 
-	var context string
-	if !ec.Options.StatusCheckContextIgnoreBase {
-		context = fmt.Sprintf("%s: %s", ec.Options.StatusCheckContext, base)
-	} else {
-		context = ec.Options.StatusCheckContext
-	}
+	context := ec.Options.StatusCheckContextWithBranch(base)
 
 	var prefix string
 	switch state {
