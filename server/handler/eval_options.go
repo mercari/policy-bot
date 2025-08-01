@@ -15,6 +15,7 @@
 package handler
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -85,6 +86,13 @@ type PullEvaluationOptions struct {
 	//
 	// TODO(bkeyes): remove in version 2.0
 	Deprecated_DoNotLoadCommitPushedDate bool `yaml:"do_not_load_commit_pushed_date"`
+}
+
+func (p *PullEvaluationOptions) StatusCheckContextWithBranch(baseBranch string) string {
+	if p.StatusCheckContextIgnoreBase {
+		return p.StatusCheckContext
+	}
+	return fmt.Sprintf("%s: %s", p.StatusCheckContext, baseBranch)
 }
 
 func (p *PullEvaluationOptions) fillDefaults() {

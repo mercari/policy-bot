@@ -98,7 +98,8 @@ func (h *Installation) postRepoInstallationStatus(ctx context.Context, client *g
 	}
 
 	head := branch.GetCommit().GetSHA()
-	contextWithBranch := fmt.Sprintf("%s: %s", h.PullOpts.StatusCheckContext, defaultBranch)
+
+	contextWithBranch := h.PullOpts.StatusCheckContextWithBranch(defaultBranch)
 	state := "success"
 	message := fmt.Sprintf("%s successfully installed.", h.AppName)
 	status := &github.RepoStatus{
