@@ -117,11 +117,11 @@ func (cf *ConfigFetcher) configForSharedRepository(ctx context.Context, client *
 	}
 
 	// If SharedOrganization is set, both the owner organization and the client needs to be overriden
-	if cf.Options.SharedOrganization != nil && cf.Options.SharedOrganizationInstallationId != nil {
+	if cf.Options.SharedOrganization != nil && cf.Options.SharedOrganizationInstallationID != nil {
 		owner = *cf.Options.SharedOrganization
-		client, err = cf.ClientCreator.NewInstallationClient(*cf.Options.SharedOrganizationInstallationId)
+		client, err = cf.ClientCreator.NewInstallationClient(*cf.Options.SharedOrganizationInstallationID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create client for shared organization %s with installation ID %d: %w", owner, *cf.Options.SharedOrganizationInstallationId, err)
+			return nil, fmt.Errorf("failed to create client for shared organization %s with installation ID %d: %w", owner, *cf.Options.SharedOrganizationInstallationID, err)
 		}
 	}
 

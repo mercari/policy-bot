@@ -41,7 +41,7 @@ type DescriptionPrefix struct {
 type PullEvaluationOptions struct {
 	PolicyPath string `yaml:"policy_path"`
 
-	SharedOrganizationInstallationId *int64  `yaml:"shared_organization_installation_id"`
+	SharedOrganizationInstallationID *int64  `yaml:"shared_organization_installation_id"`
 	SharedOrganization               *string `yaml:"shared_organization"`
 	SharedRepository                 *string `yaml:"shared_repository"`
 	SharedPolicyBranch               *string `yaml:"shared_policy_branch"`
