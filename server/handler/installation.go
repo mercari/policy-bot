@@ -107,7 +107,7 @@ func (h *Installation) postRepoInstallationStatus(ctx context.Context, client *g
 		State:       &state,
 		Description: &message,
 	}
-	if err := PostStatus(ctx, client, owner, repo, head, status); err != nil {
+	if err := PostStatus(ctx, h.PullOpts, client, owner, repo, head, status); err != nil {
 		logger.Err(errors.WithStack(err)).Msg("Failed to post repo status")
 	}
 }

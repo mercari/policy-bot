@@ -96,8 +96,15 @@ func (h *Status) processOwn(ctx context.Context, event github.StatusEvent) error
 		Description: &desc,
 	}
 
-	_, _, err = client.Repositories.CreateStatus(ctx, ownerName, repoName, commitSHA, status)
-	return err
+	if h.PullOpts.StatusCheckDryRunOnly {
+		return nil
+	}
+
+	if err := PostStatus(ctx, h.PullOpts, client, ownerName, repoName, commitSHA, status); err != nil {
+		logger.Err(errors.WithStack(err)).Msg("Failed to post status check for merge group")
+	}
+
+	return nil
 }
 
 func (h *Status) processOthers(ctx context.Context, event github.StatusEvent) error {

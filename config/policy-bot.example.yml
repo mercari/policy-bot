@@ -112,6 +112,13 @@ sessions:
 #   # POLICYBOT_OPTIONS_FORCE_SHARED_POLICY environment variable.
 #   force_shared_policy: false
 #
+#   # The shared organization to use with shared_repository.
+#   # If unset, defaults to using the same organization as the organization which contains the pull request repository.
+#   shared_organization: kouzoh
+#
+#   # The installation ID of the app installation on the shared organization.
+#   shared_organization_installation_id: 81498622
+#
 #   # The name of an organization repository to look in for a shared policy if
 #   # a repository does not define a policy file. Can also be set by the
 #   # POLICYBOT_OPTIONS_SHARED_REPOSITORY environment variable. Explicitly set

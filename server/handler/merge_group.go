@@ -74,13 +74,13 @@ func (h *MergeGroup) Handle(ctx context.Context, eventType, devlieryID string, p
 		Description: &message,
 	}
 
-	if err := PostStatus(ctx, client, owner, repository, headSHA, status); err != nil {
+	if err := PostStatus(ctx, h.PullOpts, client, owner, repository, headSHA, status); err != nil {
 		logger.Err(errors.WithStack(err)).Msg("Failed to post status check for merge group")
 	}
 
 	if h.PullOpts.PostInsecureStatusChecks {
 		status.Context = github.Ptr(h.PullOpts.StatusCheckContext)
-		if err := PostStatus(ctx, client, owner, repository, headSHA, status); err != nil {
+		if err := PostStatus(ctx, h.PullOpts, client, owner, repository, headSHA, status); err != nil {
 			logger.Err(err).Msg("Failed to post insecure repo status")
 		}
 	}

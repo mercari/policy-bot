@@ -41,12 +41,18 @@ type DescriptionPrefix struct {
 type PullEvaluationOptions struct {
 	PolicyPath string `yaml:"policy_path"`
 
-	SharedRepository   *string `yaml:"shared_repository"`
-	SharedPolicyBranch *string `yaml:"shared_policy_branch"`
-	SharedPolicyPath   *string `yaml:"shared_policy_path"`
+	SharedOrganizationInstallationId *int64  `yaml:"shared_organization_installation_id"`
+	SharedOrganization               *string `yaml:"shared_organization"`
+	SharedRepository                 *string `yaml:"shared_repository"`
+	SharedPolicyBranch               *string `yaml:"shared_policy_branch"`
+	SharedPolicyPath                 *string `yaml:"shared_policy_path"`
 
 	// Ignore PolicyPath and use SharedRepository and SharedPolicyPath only.
 	ForceSharedPolicy bool `yaml:"force_shared_policy"`
+
+	// StatusCheckDryRunOnly will be used to determine if the status check should be dry-run only and
+	// not actually written to the pull request.
+	StatusCheckDryRunOnly bool `yaml:"status_check_dry_run_only"`
 
 	// StatusCheckContext will be used to create the status context. It will be used in the following
 	// pattern: <StatusCheckContext>: <Base Branch Name>

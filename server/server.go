@@ -203,7 +203,8 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 
 		PullOpts: &c.Options,
 		ConfigFetcher: &handler.ConfigFetcher{
-			Options: c.Options,
+			ClientCreator: cc,
+			Options:       c.Options,
 			Loader: appconfig.NewLoader(
 				policyPaths,
 				appconfig.WithOwnerDefault(*c.Options.SharedRepository, sharedPolicyPaths),

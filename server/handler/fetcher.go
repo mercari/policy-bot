@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/go-github/v72/github"
 	"github.com/palantir/go-githubapp/appconfig"
+	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/palantir/policy-bot/policy"
 	"github.com/palantir/policy-bot/tracing"
 	"go.opentelemetry.io/otel/attribute"
@@ -96,12 +97,14 @@ func (cc *ConfigCache) GetOrUpdate(fn func() (*FetchedConfig, error)) (*FetchedC
 type ConfigFetcher struct {
 	sharedConfigCache ConfigCache
 
-	Options PullEvaluationOptions
-	Loader  *appconfig.Loader
+	ClientCreator githubapp.ClientCreator
+	Options       PullEvaluationOptions
+	Loader        *appconfig.Loader
 }
 
 func (cf *ConfigFetcher) configForSharedRepository(ctx context.Context, client *github.Client, owner string) (*FetchedConfig, error) {
 	var ref string
+	var err error
 	if cf.Options.SharedPolicyBranch != nil {
 		ref = *cf.Options.SharedPolicyBranch
 	} else {
@@ -111,6 +114,15 @@ func (cf *ConfigFetcher) configForSharedRepository(ctx context.Context, client *
 		}
 
 		ref = r.GetDefaultBranch()
+	}
+
+	// If SharedOrganization is set, both the owner organization and the client needs to be overriden
+	if cf.Options.SharedOrganization != nil && cf.Options.SharedOrganizationInstallationId != nil {
+		owner = *cf.Options.SharedOrganization
+		client, err = cf.ClientCreator.NewInstallationClient(*cf.Options.SharedOrganizationInstallationId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client for shared organization %s with installation ID %d: %w", owner, *cf.Options.SharedOrganizationInstallationId, err)
+		}
 	}
 
 	file, _, _, err := client.Repositories.GetContents(ctx, owner, *cf.Options.SharedRepository, *cf.Options.SharedPolicyPath, &github.RepositoryContentGetOptions{
