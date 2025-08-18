@@ -135,6 +135,9 @@ sessions:
 #   # Can also be set by the POLICYBOT_OPTIONS_SHARED_POLICY_PATH environment variable.
 #   shared_policy_path: policy.yml
 #
+#   # Whether the status check should be dry-run only (log to console only, without writing to GitHub API).
+#   status_check_dry_run_only: false
+#
 #   # The context prefix for status checks created by the bot. Can also be set by the
 #   # POLICYBOT_OPTIONS_STATUS_CHECK_CONTEXT environment variable.
 #   status_check_context: policy-bot
