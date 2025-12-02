@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/go-github/v75/github"
+	"github.com/google/go-github/v79/github"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -101,7 +101,7 @@ func (h *Installation) postRepoInstallationStatus(ctx context.Context, client *g
 	contextWithBranch := fmt.Sprintf("%s: %s", h.PullOpts.StatusCheckContext, defaultBranch)
 	state := "success"
 	message := fmt.Sprintf("%s successfully installed.", h.AppName)
-	status := &github.RepoStatus{
+	status := github.RepoStatus{
 		Context:     &contextWithBranch,
 		State:       &state,
 		Description: &message,

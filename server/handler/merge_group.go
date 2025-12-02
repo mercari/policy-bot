@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/go-github/v75/github"
+	"github.com/google/go-github/v79/github"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -68,7 +68,7 @@ func (h *MergeGroup) Handle(ctx context.Context, eventType, devlieryID string, p
 	contextWithBranch := fmt.Sprintf("%s: %s", h.PullOpts.StatusCheckContext, baseBranch)
 	state := "success"
 	message := fmt.Sprintf("%s previously approved original pull request.", h.AppName)
-	status := &github.RepoStatus{
+	status := github.RepoStatus{
 		Context:     &contextWithBranch,
 		State:       &state,
 		Description: &message,
