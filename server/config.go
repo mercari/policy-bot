@@ -34,17 +34,16 @@ const (
 )
 
 type Config struct {
-	Server        baseapp.HTTPConfig            `yaml:"server"`
-	Logging       LoggingConfig                 `yaml:"logging"`
-	Cache         CachingConfig                 `yaml:"cache"`
-	Github        githubapp.Config              `yaml:"github"`
-	Sessions      SessionsConfig                `yaml:"sessions"`
-	Options       handler.PullEvaluationOptions `yaml:"options"`
-	Files         handler.FilesConfig           `yaml:"files"`
-	Datadog       datadog.Config                `yaml:"datadog"`
-	Prometheus    prometheus.Config             `yaml:"prometheus"`
-	Workers       WorkerConfig                  `yaml:"workers"`
-	OpenTelemetry OpenTelemetryConfig           `yaml:"opentelemetry"`
+	Server     baseapp.HTTPConfig            `yaml:"server"`
+	Logging    LoggingConfig                 `yaml:"logging"`
+	Cache      CachingConfig                 `yaml:"cache"`
+	Github     githubapp.Config              `yaml:"github"`
+	Sessions   SessionsConfig                `yaml:"sessions"`
+	Options    handler.PullEvaluationOptions `yaml:"options"`
+	Files      handler.FilesConfig           `yaml:"files"`
+	Datadog    datadog.Config                `yaml:"datadog"`
+	Prometheus prometheus.Config             `yaml:"prometheus"`
+	Workers    WorkerConfig                  `yaml:"workers"`
 }
 
 type LoggingConfig struct {
@@ -100,30 +99,10 @@ func ParseConfig(bytes []byte) (*Config, error) {
 	c.Server.SetValuesFromEnv(envPrefix)
 	c.Logging.SetValuesFromEnv(envPrefix)
 	c.Github.SetValuesFromEnv("")
-	c.OpenTelemetry.SetValuesFromEnv(envPrefix)
 
 	if v, ok := os.LookupEnv(envPrefix + "SESSIONS_KEY"); ok {
 		c.Sessions.Key = v
 	}
 
 	return &c, nil
-}
-
-type OpenTelemetryConfig struct {
-	Enabled            bool `yaml:"enabled"`
-	GoogleCloudSupport bool `yaml:"google_cloud_support"`
-}
-
-func (c *OpenTelemetryConfig) SetValuesFromEnv(prefix string) {
-	if v, ok := os.LookupEnv(prefix + "OTEL_ENABLED"); ok {
-		if b, err := strconv.ParseBool(v); err == nil {
-			c.Enabled = b
-		}
-	}
-
-	if v, ok := os.LookupEnv(prefix + "OTEL_GOOGLE_CLOUD_SUPPORT"); ok {
-		if b, err := strconv.ParseBool(v); err == nil {
-			c.GoogleCloudSupport = b
-		}
-	}
 }

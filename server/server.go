@@ -36,12 +36,9 @@ import (
 	"github.com/palantir/go-githubapp/oauth2"
 	"github.com/palantir/policy-bot/pull"
 	"github.com/palantir/policy-bot/server/handler"
-	policybototel "github.com/palantir/policy-bot/server/otel"
 	"github.com/palantir/policy-bot/version"
 	"github.com/pkg/errors"
-	"github.com/rcrowley/go-metrics"
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"goji.io"
 	"goji.io/pat"
 )
@@ -58,9 +55,8 @@ const (
 )
 
 type Server struct {
-	config   *Config
-	shutdown func(context.Context) error
-	base     *baseapp.Server
+	config *Config
+	base   *baseapp.Server
 }
 
 // New instantiates a new Server.
@@ -70,9 +66,6 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 		Level:  c.Logging.Level,
 		Pretty: c.Logging.Text,
 	})
-	if c.OpenTelemetry.Enabled && c.OpenTelemetry.GoogleCloudSupport {
-		logger = logger.Hook(&policybototel.ZerologOtelGoogleCloudHook{})
-	}
 
 	lifetime, _ := time.ParseDuration(c.Sessions.Lifetime)
 	if lifetime == 0 {
@@ -97,29 +90,7 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 	sessions.HttpOnly(true)
 	sessions.Secure(forceTLS)
 
-	params := baseapp.DefaultParams(logger, "policybot.")
-	if c.OpenTelemetry.Enabled {
-		// WithMiddleware overwrites the middleware stack, so we have to generate the default and prepend to it
-		// Also we need to create a new metrics registry to ensure that the same registry is used everywhere
-		registry := metrics.NewPrefixedRegistry("policybot.")
-		middlewares := append(
-			[]func(http.Handler) http.Handler{
-				func(h http.Handler) http.Handler {
-					return otelhttp.NewHandler(h, "policy-bot", otelhttp.WithFilter(func(r *http.Request) bool {
-						skip := r.URL.Path == "/" || r.URL.Path == "/api/github/hook" ||
-							strings.HasPrefix(r.URL.Path, "/static")
-						return !skip
-					}))
-				},
-			},
-			baseapp.DefaultMiddleware(logger, registry)...,
-		)
-		params = append(params,
-			baseapp.WithRegistry(registry),
-			baseapp.WithMiddleware(middlewares...))
-	}
-
-	base, err := baseapp.NewServer(c.Server, params...)
+	base, err := baseapp.NewServer(c.Server, baseapp.DefaultParams(logger, "policybot.")...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize base server")
 	}
@@ -139,15 +110,9 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 		return nil, errors.Wrap(err, "invalid v4 API URL")
 	}
 
-	transport := http.DefaultTransport
-	if c.OpenTelemetry.Enabled {
-		transport = otelhttp.NewTransport(transport)
-	}
-
 	userAgent := fmt.Sprintf("policy-bot/%s", version.GetVersion())
 	cc, err := githubapp.NewDefaultCachingClientCreator(
 		c.Github,
-		githubapp.WithTransport(transport),
 		githubapp.WithClientUserAgent(userAgent),
 		githubapp.WithClientTimeout(githubTimeout),
 		githubapp.WithClientCaching(true, func() httpcache.Cache {
@@ -225,14 +190,14 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 
 	dispatcher := githubapp.NewEventDispatcher(
 		[]githubapp.EventHandler{
-			policybototel.Trace(&handler.Installation{Base: basePolicyHandler}),
-			policybototel.Trace(&handler.MergeGroup{Base: basePolicyHandler}),
-			policybototel.Trace(&handler.PullRequest{Base: basePolicyHandler}),
-			policybototel.Trace(&handler.PullRequestReview{Base: basePolicyHandler}),
-			policybototel.Trace(&handler.IssueComment{Base: basePolicyHandler}),
-			policybototel.Trace(&handler.Status{Base: basePolicyHandler}),
-			policybototel.Trace(&handler.CheckRun{Base: basePolicyHandler}),
-			policybototel.Trace(&handler.WorkflowRun{Base: basePolicyHandler}),
+			&handler.Installation{Base: basePolicyHandler},
+			&handler.MergeGroup{Base: basePolicyHandler},
+			&handler.PullRequest{Base: basePolicyHandler},
+			&handler.PullRequestReview{Base: basePolicyHandler},
+			&handler.IssueComment{Base: basePolicyHandler},
+			&handler.Status{Base: basePolicyHandler},
+			&handler.CheckRun{Base: basePolicyHandler},
+			&handler.WorkflowRun{Base: basePolicyHandler},
 		},
 		c.Github.App.WebhookSecret,
 		githubapp.WithErrorCallback(githubapp.MetricsErrorCallback(base.Registry())),
@@ -248,14 +213,6 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 	templates, err := handler.LoadTemplates(&c.Files, basePath, c.Github.WebURL)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load templates")
-	}
-
-	var shutdown func(context.Context) error
-	if c.OpenTelemetry.Enabled {
-		shutdown, err = policybototel.SetupOpenTelemetry(ctx, logger, c.OpenTelemetry.GoogleCloudSupport)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to setup OpenTelemetry")
-		}
 	}
 
 	var mux *goji.Mux
@@ -315,9 +272,8 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 	mux.Handle(pat.New("/details/*"), details)
 
 	return &Server{
-		config:   c,
-		base:     base,
-		shutdown: shutdown,
+		config: c,
+		base:   base,
 	}, nil
 }
 
@@ -348,10 +304,5 @@ func (s *Server) Start() error {
 		stop()
 	}
 
-	if s.shutdown != nil {
-		if err := s.shutdown(context.Background()); err != nil {
-			return errors.Wrap(err, "failed to shutdown OpenTelemetry")
-		}
-	}
 	return nil
 }
