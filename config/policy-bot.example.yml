@@ -174,9 +174,3 @@ sessions:
 # files:
 #   static: build/static
 #   templates: server/templates
-
-# Options for OpenTelemetry tracing.
-#
-# opentelemetry:
-#   enabled: true
-#   google_cloud_support: true

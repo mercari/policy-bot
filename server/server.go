@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
-	"os/signal"
 	"strings"
 	"time"
 
@@ -61,7 +59,7 @@ type Server struct {
 
 // New instantiates a new Server.
 // Callers must then invoke Start to run the Server.
-func New(ctx context.Context, c *Config) (*Server, error) {
+func New(c *Config) (*Server, error) {
 	logger := baseapp.NewLogger(baseapp.LoggingConfig{
 		Level:  c.Logging.Level,
 		Pretty: c.Logging.Text,
@@ -135,7 +133,7 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 		return nil, errors.Wrap(err, "failed to initialize Github app client")
 	}
 
-	app, _, err := appClient.Apps.Get(ctx, "")
+	app, _, err := appClient.Apps.Get(context.Background(), "")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get configured GitHub app")
 	}
@@ -168,7 +166,6 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 
 		PullOpts: &c.Options,
 		ConfigFetcher: &handler.ConfigFetcher{
-			Options: c.Options,
 			Loader: appconfig.NewLoader(
 				policyPaths,
 				appconfig.WithOwnerDefault(*c.Options.SharedRepository, sharedPolicyPaths),
@@ -279,30 +276,10 @@ func New(ctx context.Context, c *Config) (*Server, error) {
 
 // Start is blocking and long-running
 func (s *Server) Start() error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
-	defer stop()
-
 	if s.config.Datadog.Address != "" {
 		if err := datadog.StartEmitter(s.base, s.config.Datadog); err != nil {
 			return err
 		}
 	}
-
-	var err error
-	serverErr := make(chan error, 1)
-	go func() {
-		defer close(serverErr)
-		if err := s.base.Start(); err != nil {
-			serverErr <- err
-		}
-	}()
-
-	select {
-	case err = <-serverErr:
-		return err
-	case <-ctx.Done():
-		stop()
-	}
-
-	return nil
+	return s.base.Start()
 }

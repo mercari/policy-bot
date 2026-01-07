@@ -78,20 +78,20 @@ func (ec *EvalContext) ParseConfig(ctx context.Context, trigger common.Trigger) 
 	switch {
 	case fc.LoadError != nil:
 		msg := fmt.Sprintf("Error loading policy from %s", fc.Source)
-		logger.Warn().Ctx(ctx).Err(fc.LoadError).Msg(msg)
+		logger.Warn().Err(fc.LoadError).Msg(msg)
 
 		ec.PostStatus(ctx, "error", msg)
 		return nil, errors.Wrapf(fc.LoadError, "failed to load policy: %s: %s", fc.Source, fc.Path)
 
 	case fc.ParseError != nil:
 		msg := fmt.Sprintf("Invalid policy in %s: %s", fc.Source, fc.Path)
-		logger.Warn().Ctx(ctx).Err(fc.ParseError).Msg(msg)
+		logger.Warn().Err(fc.ParseError).Msg(msg)
 
 		ec.PostStatus(ctx, "error", msg)
 		return nil, errors.Wrapf(fc.ParseError, "failed to parse policy: %s: %s", fc.Source, fc.Path)
 
 	case fc.Config == nil:
-		logger.Debug().Ctx(ctx).Msg("No policy defined for repository")
+		logger.Debug().Msg("No policy defined for repository")
 		return nil, nil
 	}
 
@@ -103,7 +103,7 @@ func (ec *EvalContext) ParseConfig(ctx context.Context, trigger common.Trigger) 
 	evaluator, err := policy.ParsePolicy(fc.Config, opts)
 	if err != nil {
 		msg := fmt.Sprintf("Invalid policy in %s: %s", fc.Source, fc.Path)
-		logger.Warn().Ctx(ctx).Err(err).Msg(msg)
+		logger.Warn().Err(err).Msg(msg)
 
 		ec.PostStatus(ctx, "error", msg)
 		return nil, errors.Wrapf(err, "failed to create evaluator: %s: %s", fc.Source, fc.Path)
@@ -111,7 +111,7 @@ func (ec *EvalContext) ParseConfig(ctx context.Context, trigger common.Trigger) 
 
 	policyTrigger := evaluator.Trigger()
 	if !trigger.Matches(policyTrigger) {
-		logger.Debug().Ctx(ctx).
+		logger.Debug().
 			Str("event_trigger", trigger.String()).
 			Str("policy_trigger", policyTrigger.String()).
 			Msg("No evaluation necessary for this trigger, skipping")
@@ -130,7 +130,7 @@ func (ec *EvalContext) EvaluatePolicy(ctx context.Context, evaluator common.Eval
 	result := evaluator.Evaluate(ctx, ec.PullContext)
 	if result.Error != nil {
 		msg := fmt.Sprintf("Error evaluating policy in %s: %s", ec.Config.Source, ec.Config.Path)
-		logger.Warn().Ctx(ctx).Err(result.Error).Msg(msg)
+		logger.Warn().Err(result.Error).Msg(msg)
 
 		ec.PostStatus(ctx, "error", msg)
 		return result, result.Error
@@ -168,11 +168,11 @@ func (ec *EvalContext) RunPostEvaluateActions(ctx context.Context, result common
 	logger := zerolog.Ctx(ctx)
 
 	if err := ec.requestReviewsForResult(ctx, trigger, result); err != nil {
-		logger.Error().Ctx(ctx).Err(err).Msg("Failed to request reviewers")
+		logger.Error().Err(err).Msg("Failed to request reviewers")
 	}
 
 	if err := ec.dismissStaleReviewsForResult(ctx, result); err != nil {
-		logger.Error().Ctx(ctx).Err(err).Msg("Failed to dismiss stale reviews")
+		logger.Error().Err(err).Msg("Failed to dismiss stale reviews")
 	}
 }
 
@@ -201,7 +201,7 @@ func (ec *EvalContext) PostStatus(ctx context.Context, state, message string) {
 	case "error":
 		prefix = ec.Options.StatusCheckDescriptionPrefix.Error
 	default:
-		logger.Warn().Ctx(ctx).Msgf("Unknown status state: %s, using empty prefix", state)
+		logger.Warn().Msgf("Unknown status state: %s, using empty prefix", state)
 	}
 
 	var description string
@@ -224,7 +224,7 @@ func (ec *EvalContext) PostStatus(ctx context.Context, state, message string) {
 	}
 
 	if !ec.PullContext.IsOpen() {
-		logger.Info().Ctx(ctx).Msg("Skipping status update because PR state is not open")
+		logger.Info().Msg("Skipping status update because PR state is not open")
 		return
 	}
 

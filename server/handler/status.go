@@ -72,7 +72,7 @@ func (h *Status) processOwn(ctx context.Context, event github.StatusEvent) error
 		return nil
 	}
 
-	logger.Warn().Ctx(ctx).
+	logger.Warn().
 		Str(LogKeyAudit, event.GetName()).
 		Str(LogKeyGitHubSHA, commitSHA).
 		Msgf(
@@ -127,7 +127,7 @@ func (h *Status) processOthers(ctx context.Context, event github.StatusEvent) er
 	if err != nil {
 		return errors.Wrapf(err, "failed to list pull requests for SHA %s", commitSHA)
 	}
-	logger.Debug().Ctx(ctx).Msgf("Status event is for '%s', found %d PRs", event.GetContext(), len(prs))
+	logger.Debug().Msgf("Status event is for '%s', found %d PRs", event.GetContext(), len(prs))
 
 	evaluationFailures := 0
 	for _, pr := range prs {
@@ -140,7 +140,7 @@ func (h *Status) processOthers(ctx context.Context, event github.StatusEvent) er
 			})
 			if err != nil {
 				evaluationFailures++
-				logger.Error().Ctx(ctx).Err(err).Msgf("Failed to evaluate pull request '%d' for SHA '%s'", pr.GetNumber(),
+				logger.Error().Err(err).Msgf("Failed to evaluate pull request '%d' for SHA '%s'", pr.GetNumber(),
 					commitSHA)
 
 			}

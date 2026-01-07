@@ -205,7 +205,7 @@ func TestReviews(t *testing.T) {
 func TestNoReviews(t *testing.T) {
 	rp := &ResponsePlayer{}
 	dataRule := rp.AddRule(
-		GraphQLNodePrefixMatcher("repository.pullRequest.commits"),
+		GraphQLNodePrefixMatcher("repository.pullRequest.reviews"),
 		"testdata/responses/pull_no_reviews.yml",
 	)
 
