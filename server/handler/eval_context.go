@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v79/github"
 	"github.com/palantir/policy-bot/policy"
 	"github.com/palantir/policy-bot/policy/common"
 	"github.com/palantir/policy-bot/pull"
@@ -95,7 +95,12 @@ func (ec *EvalContext) ParseConfig(ctx context.Context, trigger common.Trigger) 
 		return nil, nil
 	}
 
-	evaluator, err := policy.ParsePolicy(fc.Config)
+	opts := &policy.GlobalOptions{
+		IgnoreEditedComments: ec.Options.IgnoreEditedComments,
+		ApprovalDefaults:     ec.Options.ApprovalDefaults,
+	}
+
+	evaluator, err := policy.ParsePolicy(fc.Config, opts)
 	if err != nil {
 		msg := fmt.Sprintf("Invalid policy in %s: %s", fc.Source, fc.Path)
 		logger.Warn().Ctx(ctx).Err(err).Msg(msg)
@@ -223,12 +228,12 @@ func (ec *EvalContext) PostStatus(ctx context.Context, state, message string) {
 		return
 	}
 
-	if err := PostStatus(ctx, ec.Client, owner, repo, sha, &status); err != nil {
+	if err := PostStatus(ctx, ec.Client, owner, repo, sha, status); err != nil {
 		logger.Err(err).Msg("Failed to post repo status")
 	}
 	if ec.Options.PostInsecureStatusChecks {
 		status.Context = github.Ptr(ec.Options.StatusCheckContext)
-		if err := PostStatus(ctx, ec.Client, owner, repo, sha, &status); err != nil {
+		if err := PostStatus(ctx, ec.Client, owner, repo, sha, status); err != nil {
 			logger.Err(err).Msg("Failed to post insecure repo status")
 		}
 	}

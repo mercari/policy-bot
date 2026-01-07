@@ -1,3 +1,7 @@
+<p align="right">
+<a href="https://autorelease.general.dmz.palantir.tech/palantir/policy-bot"><img src="https://img.shields.io/badge/Perform%20an-Autorelease-success.svg" alt="Autorelease"></a>
+</p>
+
 # policy-bot <!-- omit in toc -->
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/palantirtechnologies/policy-bot.svg)](https://hub.docker.com/r/palantirtechnologies/policy-bot/)
@@ -136,6 +140,10 @@ instance of the server.
   repository, `policy-bot` does not post a status check on the pull request.
   This means it is safe to enable `policy-bot` on all repositories in an
   organization.
+
+Server administrators can also set the `force_shared_policy` option to disable
+loading policies from local repositories, requiring that all repositories use a
+policy supplied in a shared organization repository.
 
 ### policy.yml Specification
 
@@ -367,10 +375,22 @@ if:
   # "modified_lines" is satisfied if the number of lines added or deleted by
   # the pull request matches any of the listed conditions. Each expression is
   # an operator (one of '<', '>' or '='), an optional space, and a number.
+  # Optionally, use "files" to filter which files are counted:
+  # - If files is not specified, all files are counted
+  # - If only files.include is specified, only matching files are counted
+  # - If only files.exclude is specified, all files except those matching are counted
+  # - If both are specified, files must match an include pattern and NOT match any exclude pattern
   modified_lines:
     additions: "> 100"
     deletions: "> 100"
     total: "> 200"
+    files:
+      include:
+        - ".*\\.go$"
+        - ".*\\.js$"
+      exclude:
+        - ".*_test\\.go$"
+        - ".*\\.generated\\..*"
 
   # DEPRECATED: Use "has_status" below instead, which is more flexible.
   # "has_successful_status" is satisfied if the status checks that are specified
@@ -454,6 +474,46 @@ if:
   # the authenticated signatures are attributed to a GPG key with an ID in the list.
   has_valid_signatures_by_keys:
     key_ids: ["3AA5C34371567BD2"]
+
+  # "custom_property_is_not_null" is satisfied if all of the specified repository
+  # custom properties are set to a non-empty string or array on the target repository.
+  custom_property_is_not_null:
+    - "release_tier"
+    - "service_owner"
+
+  # "custom_property_is_null" is satisfied if all of the specified repository
+  # custom properties are unset or set to an empty string or array on the
+  # target repository.
+  custom_property_is_null:
+    - "deprecated_since"
+
+  # "custom_property_matches_any_of" is satisfied if, for each property key in
+  # the map, the repository custom property exists and its string value matches
+  # at least one of the provided regular expressions. 
+  #
+  # Regex matching only applies to string typed (including boolean) custom properties.
+  # Array-type properties are not matched and will cause the predicate to fail
+  # for that key. Unset/null properties will also fail the match.
+  #
+  # Note: Double-quote strings must escape backslashes while single/plain do not.
+  # See the Notes on YAML Syntax section of this README for more information.
+  custom_property_matches_any_of:
+    environment: ["^prod$", "^staging$"]
+    service_tier: ["^(critical|high)$"]
+
+  # "custom_property_matches_none_of" is satisfied if, for each property key in
+  # the map, the repository custom property does not exist, its string value matches
+  # none of the provided regular expressions.
+  #
+  # Regex matching only applies to string typed (including boolean) custom properties.
+  # Array-type properties are not matched and will cause the predicate to always pass
+  # for that key. Unset/null properties will also pass the match.
+  #
+  # Note: Double-quote strings must escape backslashes while single/plain do not.
+  # See the Notes on YAML Syntax section of this README for more information.
+  custom_property_matches_none_of:
+    environment: ["^dev$", "^test$"]
+    service_tier: ["^low$"]
 
 # "options" specifies a set of restrictions on approvals. If the block does not
 # exist, the default values are used.
@@ -597,6 +657,81 @@ requires:
         - "vulnerability scan"
 ```
 
+#### Default Options
+
+Policies and server administrators can define new default values for approval
+rule options. This makes it easier to set common options across all rules.
+Policy Bot tries values in the following order until it finds a set value:
+
+1. Explicit rule options
+2. Policy-level default options
+3. Configurable server-level default options
+4. Hardcoded server-level default options
+
+To define policy-level defaults, add the `approval_defaults` section at the top
+level of the policy file:
+
+```yaml
+approval_defaults:
+  # "options" can contain any property available as a rule-level option
+  options:
+    invalidate_on_push: true
+    methods:
+      comments: []
+      comment_patterns: ["^LGTM$"]
+
+approval_rules:
+  # Existing approvals for this rule are invalided by new commits and it uses
+  # the "LGTM" comment to indicate approval
+  - name: devtools approval
+    requires:
+      count: 1
+      teams: ["palantir/devtools"]
+
+  # Existing approvals for this rule are also invalided by new commits, but it
+  # uses the ":+1:" comment to indicate approval
+  - name: special approval comments
+    options:
+      methods:
+        comment_patterns: ["^:+1:$"]
+    requires:
+      count: 1
+      teams: ["palantir/plus-oners"]
+```
+
+Option values are not merged. For example, defining the `ignore_commits_by` or
+`methods.comment_patterns` options in a rule completely replaces any default
+values for these options.
+
+The only exception to this is the `methods` property, which supports limited
+merging. This matches the legacy behavior for how rule values combined with the
+hardcoded server defaults. For example:
+
+```yaml
+# server defaults
+options:
+  methods:
+    comments: ["==APPROVED=="]
+
+# policy defaults
+options:
+  methods:
+    comment_patterns: ["^LGTM$"]
+    github_review: false
+
+# rule overrides
+options:
+  methods:
+    comment_patterns: ["^:+1:$"]
+
+# combined value used during evaluation
+options:
+  methods:
+    comments: ["==APPROVED=="]
+    comment_patterns: ["^:+1:$"]
+    github_review: false
+```
+
 ### Approval Policies
 
 The `approval` block in the `policy` section defines a list of rules that must
@@ -705,22 +840,30 @@ however it cannot validate that the rules are semantically correct for a given u
 The API can be used as such:
 
 ```sh
-$ curl https://policybot.domain/api/validate -XPUT -T path/to/policy.yml
+$ curl https://policybot.domain/api/validate -T path/to/policy.yml
 {"message":"failed to parse approval policy: failed to parse subpolicies for 'and': policy references undefined rule 'the devtools team has approved', allowed values: [the devtools team has]","version":"1.12.5"}
 ```
 
-You can examine the HTTP response code to automatically detect failures
+When using `curl` you can have it detect failures (4xx and 5xx status codes) with the `--fail-with-body` flag and still show the response body.
+Using the `-S` flag will also print the response status code on failure.
 
 ```sh
-$ rcode=$(curl https://policybot.domain/api/validate -XPUT -T path/to/policy.yml -s -w "%{http_code}" -o /tmp/response)
-$ if [[ "${rcode}" -gt 299 ]]; then cat /tmp/response && exit 1; fi
+$ curl -s -S --fail-with-body https://policybot.domain/api/validate -T ./.policy.yml
+curl: (22) The requested URL returned error: 422
+{"message":"failed to parse approval policy: failed to parse subpolicies for 'and': policy references undefined rule 'the devtools team has approved', allowed values: [the devtools team has]","version":"1.12.5"}
+```
+
+The `policy-bot` binary also includes a `validate` subcomand that can validate local policy files without running a server instance:
+
+```sh
+policy-bot validate -p path/to/policy.yml
 ```
 
 #### Simulation API
 
 It can be useful to simulate how Policy Bot would evaluate a pull request if certain conditions were changed. For example: adding a review from a specific user or group, or adjusting the base branch.
 
-An API endpoint exists at `api/simulate/:org/:repo/:prNumber` to simiulate the result of a pull request. Simulations using this endpoint will NOT write the result back to the pull request status check and will instead return the result.
+An API endpoint exists at `api/simulate/:org/:repo/:prNumber` to simulate the result of a pull request. Simulations using this endpoint will NOT write the result back to the pull request status check and will instead return the result.
 
 This API requires a GitHub token be passed as a bearer token. The token must have the ability to read the pull request the simulation is being run against.
 
@@ -813,7 +956,7 @@ use a previous, non-dismissed review, if it exists, when evaluating rules.
 
 For example, if a user leaves an "approval" review and follows up with a
 "request changes" review, `policy-bot` will use the "request changes" review
-when evaluating rules. However, if the user then dimisses their "request
+when evaluating rules. However, if the user then dismisses their "request
 changes" review, `policy-bot` will instead use the initial "approval" review in
 evaluating any rules.
 
@@ -908,7 +1051,7 @@ from the set.
 
 #### Invalidating Approval on Push <!-- omit in toc -->
 
-By default, `policy-bot` does not invalidate exisitng approvals when users add
+By default, `policy-bot` does not invalidate existing approvals when users add
 new commits to a pull request. You can control this behavior for each rule in a
 policy using the `invalidate_on_push` option.
 
@@ -937,7 +1080,7 @@ in mid-2023 because computing it was unreliable and inaccurate (see issue
 #### Expanding Required Reviewers <!-- omit in toc -->
 
 The details view for a pull request shows the users, organizations, teams, and
-permission levels that are reqired to approve each rule. When the
+permission levels that are required to approve each rule. When the
 `options.expand_required_reviewers` server option is set, `policy-bot` expands
 these to show the list of users whose approval will satisfy each rule. This can
 make it easier for developers to figure out who they should ask for approval.
@@ -982,11 +1125,12 @@ relevant audit logs or minimize write access to repositories.
 
 GitHub users with sufficient permissions can edit the comments of other users,
 possibly changing an unrelated comment into one that enables approval.
-`policy-bot` also contains audting for this event, but as with statuses, a
+`policy-bot` also contains auditing for this event, but as with statuses, a
 well-timed edit can approve and merge a pull request before `policy-bot` can
 detect the problem. Organizations concerned about this case can use the
-`ignore_edited_comments` option or can monitor and alert on the relevant audit
-logs.
+`options.ignore_edited_comments` server configuration option, the
+`ignore_edited_comments` rule option, or can monitor and 
+alert on the relevant audit logs.
 
 This issue can also be minimized by only using GitHub reviews for approval, at
 the expense of removing the ability to self-approve pull requests.
@@ -1054,20 +1198,26 @@ To configure `policy-bot` as a GitHub App, set these options in GitHub:
   - Set **Webhook secret**: A random string that matches the value of the
     `github.app.webhook_secret` property in the server configuration
 
-The app requires these permissions:
+The app requires these **repository** permissions:
 
 | Permission | Access | Reason |
 | ---------- | ------ | ------ |
-| Actions| Read-only | Read workflow run events for the `has_workflow_result` predicate |
-| Repository contents | Read-only | Read configuration and commit metadata |
+| Actions | Read-only | Read workflow run events for the `has_workflow_result` predicate |
+| Administration | Read-only | Read repository collaborators and permissions |
 | Checks | Read-only | Read check run results |
-| Repository administration | Read-only | Read admin team(s) membership |
+| Commit statuses | Read & write | Post commit statuses |
+| Contents | Read-only | Read policy files and commit metadata |
+| Custom properties | Read-only | Read properties for the `custom_property_*` predicates |
 | Issues | Read-only | Read pull request comments |
 | Merge Queues | Read-only | Read repository merge queues |
-| Repository metadata | Read-only | Basic repository data |
+| Metadata | Read-only | Access basic repository data |
 | Pull requests | Read & write | Receive pull request events, read metadata. Assign reviewers |
-| Commit status | Read & write | Post commit statuses |
-| Organization members | Read-only | Determine organization and team membership |
+
+The app also requires these **organization** permissions:
+
+| Permission | Access | Reason |
+| ---------- | ------ | ------ |
+| Members | Read-only | Determine organization and team membership |
 
 The app should be subscribed to these events:
 

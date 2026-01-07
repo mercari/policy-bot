@@ -98,10 +98,10 @@ func (h *DetailsReviewers) ServeHTTP(w http.ResponseWriter, r *http.Request) err
 		}
 	}
 
-	// Add reviewers with permissions
 	perms := requires.Actors.GetPermissions()
 	if len(perms) > 0 {
-		userCollaborators, err := prctx.RepositoryCollaborators()
+		minPerm := slices.Min(perms)
+		userCollaborators, err := prctx.RepositoryCollaborators(minPerm)
 		if err != nil {
 			logger.Warn().Ctx(r.Context()).Err(err).Msg("Error listing user collaborators, reviewers will be incomplete")
 			incomplete = true

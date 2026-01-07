@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sort"
 
 	"github.com/palantir/policy-bot/policy/common"
@@ -123,7 +124,7 @@ func selectRandomUsers(n int, users []string, r *rand.Rand) []string {
 }
 
 func selectTeamMembers(prctx pull.Context, allTeams []string) (map[string][]string, error) {
-	var allTeamsMembers = make(map[string][]string)
+	allTeamsMembers := make(map[string][]string)
 	for _, team := range allTeams {
 		teamMembers, err := prctx.TeamMembers(team)
 		if err != nil {
@@ -241,7 +242,11 @@ func selectUserReviewers(ctx context.Context, prctx pull.Context, selection *Sel
 		}
 	}
 
-	collaborators, err := prctx.RepositoryCollaborators()
+	minPerm := pull.PermissionNone
+	if len(result.ReviewRequestRule.Permissions) > 0 {
+		minPerm = slices.Min(result.ReviewRequestRule.Permissions)
+	}
+	collaborators, err := prctx.RepositoryCollaborators(minPerm)
 	if err != nil {
 		return errors.Wrap(err, "failed to list repository collaborators")
 	}

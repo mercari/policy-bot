@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v79/github"
 	"github.com/palantir/go-githubapp/appconfig"
 	"github.com/palantir/policy-bot/policy"
 	"github.com/palantir/policy-bot/tracing"
