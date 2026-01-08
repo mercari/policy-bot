@@ -1,12 +1,21 @@
 module.exports = {
+  content: {
+    relative: true,
+    files: [
+      './server/templates/**/*.html.tmpl',
+      './server/assets/**/*.js',
+    ],
+  },
   theme: {
-    // generated from @blueprintjs/core v5 colors
-    // curl -s https://raw.githubusercontent.com/palantir/blueprint/develop/packages/colors/src/_colors.scss \
-    //   | grep '^\$' \
-    //   | sed 's/\$\(.*\): \([#0-9a-f]*\).*/  '"'\1': '\2',/"
     colors: {
+      'inherit': 'inherit',
       'transparent': 'transparent',
       'current': 'currentColor',
+
+      // generated from @blueprintjs/core v5 colors
+      // curl -s https://raw.githubusercontent.com/palantir/blueprint/develop/packages/colors/src/_colors.scss \
+      //   | grep '^\$' \
+      //   | sed 's/\$\(.*\): \([#0-9a-f]*\).*/  '"'\1': '\2',/"
       'black': '#111418',
       'dark-gray1': '#1c2127',
       'dark-gray2': '#252a31',
@@ -100,7 +109,7 @@ module.exports = {
       // 0 -> xs, 1 -> sm, 2 -> default, 3 -> lg, 4 -> xl
       'xs': '0 0 0 1px rgba(16,22,26, 0.15), 0 0 0 rgba(16,22,26, 0), 0 0 0 rgba(16,22,26, 0)',
       'sm': '0 0 0 1px rgba(16,22,26, 0.1), 0 0 0 rgba(16,22,26, 0), 0 1px 1px rgba(16,22,26, 0.2)',
-      'default': '0 0 0 1px rgba(16,22,26, 0.1), 0 1px 1px rgba(16,22,26, 0.2), 0 2px 6px rgba(16,22,26, 0.2)',
+      'DEFAULT': '0 0 0 1px rgba(16,22,26, 0.1), 0 1px 1px rgba(16,22,26, 0.2), 0 2px 6px rgba(16,22,26, 0.2)',
       'lg': '0 0 0 1px rgba(16,22,26, 0.1), 0 2px 4px rgba(16,22,26, 0.2), 0 8px 24px rgba(16,22,26, 0.2)',
       'xl': '0 0 0 1px rgba(16,22,26, 0.1), 0 4px 8px rgba(16,22,26, 0.2), 0 18px 46px 6px rgba(16,22,26, 0.2)',
 
@@ -109,19 +118,22 @@ module.exports = {
       'outline': '0 0 0 3px rgba(52,144,220,0.5)',
       'none': 'none',
     },
+    fontSize: {
+      xs: '0.75rem',
+      sm: '0.875rem',
+      base: '1rem',
+      lg: '1.125rem',
+      xl: '1.25rem',
+      '2xl': '1.5rem',
+      '3xl': '1.875rem',
+      '4xl': '2.25rem',
+      '5xl': '3rem',
+      '6xl': '4rem',
+    },
     extend: {
       inset: {
         '1/2': '50%',
       },
     },
-  },
-  corePlugins: {
-    container: false,
-    keyframes: false,
-    animation: true,
-  },
-  purge: false,
-  future: {
-    removeDeprecatedGapUtilities: true,
   },
 }

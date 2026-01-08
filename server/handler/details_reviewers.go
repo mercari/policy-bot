@@ -50,7 +50,7 @@ func (h *DetailsReviewers) ServeHTTP(w http.ResponseWriter, r *http.Request) err
 	config := evalctx.Config
 	switch {
 	case config.LoadError != nil:
-		logger.Warn().Ctx(r.Context()).Err(config.LoadError).Msgf("Error loading policy from %s, reviewers will be incomplete", config.Source)
+		logger.Warn().Err(config.LoadError).Msgf("Error loading policy from %s, reviewers will be incomplete", config.Source)
 		return h.renderReviewers(w, r, DetailsReviewersData{Incomplete: true})
 
 	case config.Config == nil:
@@ -80,7 +80,7 @@ func (h *DetailsReviewers) ServeHTTP(w http.ResponseWriter, r *http.Request) err
 	for _, org := range requires.Actors.Organizations {
 		members, err := prctx.OrganizationMembers(org)
 		if err != nil {
-			logger.Warn().Ctx(r.Context()).Err(err).Str("organization", org).Msg("Error listing organization members, reviewers will be incomplete")
+			logger.Warn().Err(err).Str("organization", org).Msg("Error listing organization members, reviewers will be incomplete")
 			incomplete = true
 		} else {
 			reviewers = append(reviewers, members...)
@@ -91,19 +91,19 @@ func (h *DetailsReviewers) ServeHTTP(w http.ResponseWriter, r *http.Request) err
 	for _, team := range requires.Actors.Teams {
 		members, err := prctx.TeamMembers(team)
 		if err != nil {
-			logger.Warn().Ctx(r.Context()).Err(err).Str("team", team).Msg("Error listing team members, reviewers will be incomplete")
+			logger.Warn().Err(err).Str("team", team).Msg("Error listing team members, reviewers will be incomplete")
 			incomplete = true
 		} else {
 			reviewers = append(reviewers, members...)
 		}
 	}
 
-	// Add reviewers with permissions
 	perms := requires.Actors.GetPermissions()
 	if len(perms) > 0 {
-		userCollaborators, err := prctx.RepositoryCollaborators()
+		minPerm := slices.Min(perms)
+		userCollaborators, err := prctx.RepositoryCollaborators(minPerm)
 		if err != nil {
-			logger.Warn().Ctx(r.Context()).Err(err).Msg("Error listing user collaborators, reviewers will be incomplete")
+			logger.Warn().Err(err).Msg("Error listing user collaborators, reviewers will be incomplete")
 			incomplete = true
 		} else {
 			for _, user := range userCollaborators {

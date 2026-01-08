@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v79/github"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/palantir/policy-bot/policy/common"
 	"github.com/palantir/policy-bot/pull"
@@ -50,7 +50,7 @@ func (h *CheckRun) Handle(ctx context.Context, eventType, deliveryID string, pay
 
 	ctx, logger := githubapp.PrepareRepoContext(ctx, installationID, repo)
 
-	logger.Debug().Ctx(ctx).Msgf("Check run event is for '%s', found %d PRs", event.GetCheckRun().GetName(), len(event.GetCheckRun().PullRequests))
+	logger.Debug().Msgf("Check run event is for '%s', found %d PRs", event.GetCheckRun().GetName(), len(event.GetCheckRun().PullRequests))
 
 	evaluationFailures := 0
 	for _, pr := range event.GetCheckRun().PullRequests {
@@ -67,7 +67,7 @@ func (h *CheckRun) Handle(ctx context.Context, eventType, deliveryID string, pay
 		// do with us.
 		prBaseRepo := pr.GetBase().GetRepo()
 		if prBaseRepo.GetID() != repoID {
-			logger.Debug().Ctx(ctx).Msgf("Skipping pull request '%d' from different repository '%s'", pr.GetNumber(), prBaseRepo.GetURL())
+			logger.Debug().Msgf("Skipping pull request '%d' from different repository '%s'", pr.GetNumber(), prBaseRepo.GetURL())
 			continue
 		}
 
@@ -78,7 +78,7 @@ func (h *CheckRun) Handle(ctx context.Context, eventType, deliveryID string, pay
 			Value:  pr,
 		}); err != nil {
 			evaluationFailures++
-			logger.Error().Ctx(ctx).Err(err).Msgf("Failed to evaluate pull request '%d' for SHA '%s'", pr.GetNumber(), commitSHA)
+			logger.Error().Err(err).Msgf("Failed to evaluate pull request '%d' for SHA '%s'", pr.GetNumber(), commitSHA)
 		}
 	}
 	if evaluationFailures == 0 {

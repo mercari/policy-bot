@@ -22,7 +22,6 @@ import (
 
 	"github.com/palantir/policy-bot/policy/common"
 	"github.com/palantir/policy-bot/pull"
-	"github.com/palantir/policy-bot/tracing"
 	"github.com/pkg/errors"
 )
 
@@ -42,9 +41,6 @@ type ChangedFiles struct {
 var _ Predicate = &ChangedFiles{}
 
 func (pred *ChangedFiles) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	_, span := tracing.Tracer.Start(ctx, "ChangedFiles.Evaluate")
-	defer span.End()
-
 	paths := getPathStrings(pred.Paths)
 	ignorePaths := getPathStrings(pred.IgnorePaths)
 
@@ -97,9 +93,6 @@ type OnlyChangedFiles struct {
 var _ Predicate = &OnlyChangedFiles{}
 
 func (pred *OnlyChangedFiles) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	_, span := tracing.Tracer.Start(ctx, "OnlyChangedFiles.Evaluate")
-	defer span.End()
-
 	paths := getPathStrings(pred.Paths)
 
 	predicateResult := common.PredicateResult{
@@ -153,9 +146,6 @@ type NoChangedFiles struct {
 var _ Predicate = &NoChangedFiles{}
 
 func (pred *NoChangedFiles) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	ctx, span := tracing.Tracer.Start(ctx, "NoChangedFiles.Evaluate")
-	defer span.End()
-
 	changedFiles := ChangedFiles{
 		Paths:       pred.Paths,
 		IgnorePaths: pred.IgnorePaths,
@@ -195,9 +185,6 @@ type FileAdded struct {
 var _ Predicate = &FileAdded{}
 
 func (pred *FileAdded) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	_, span := tracing.Tracer.Start(ctx, "FileAdded.Evaluate")
-	defer span.End()
-
 	paths := getPathStrings(pred.Paths)
 	predicateResult := common.PredicateResult{
 		Satisfied:       false,
@@ -242,9 +229,6 @@ type FileNotAdded struct {
 var _ Predicate = &FileNotAdded{}
 
 func (pred *FileNotAdded) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	_, span := tracing.Tracer.Start(ctx, "FileNotAdded.Evaluate")
-	defer span.End()
-
 	paths := getPathStrings(pred.Paths)
 
 	predicateResult := common.PredicateResult{
@@ -291,9 +275,6 @@ type FileDeleted struct {
 var _ Predicate = &FileDeleted{}
 
 func (pred *FileDeleted) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	_, span := tracing.Tracer.Start(ctx, "FileDeleted.Evaluate")
-	defer span.End()
-
 	paths := getPathStrings(pred.Paths)
 
 	predicateResult := common.PredicateResult{
@@ -339,9 +320,6 @@ type FileNotDeleted struct {
 var _ Predicate = &FileNotDeleted{}
 
 func (pred *FileNotDeleted) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	_, span := tracing.Tracer.Start(ctx, "FileNotDeleted.Evaluate")
-	defer span.End()
-
 	paths := getPathStrings(pred.Paths)
 	predicateResult := common.PredicateResult{
 		Satisfied:         true,
@@ -381,9 +359,29 @@ func (pred *FileNotDeleted) Trigger() common.Trigger {
 }
 
 type ModifiedLines struct {
-	Additions ComparisonExpr `yaml:"additions,omitempty"`
-	Deletions ComparisonExpr `yaml:"deletions,omitempty"`
-	Total     ComparisonExpr `yaml:"total,omitempty"`
+	Additions ComparisonExpr          `yaml:"additions,omitempty"`
+	Deletions ComparisonExpr          `yaml:"deletions,omitempty"`
+	Total     ComparisonExpr          `yaml:"total,omitempty"`
+	Files     ModifiedLinesFileFilter `yaml:"files,omitempty"`
+}
+
+type ModifiedLinesFileFilter struct {
+	Include []common.Regexp `yaml:"include,omitempty"`
+	Exclude []common.Regexp `yaml:"exclude,omitempty"`
+}
+
+func (ff ModifiedLinesFileFilter) IsZero() bool {
+	return len(ff.Include) == 0 && len(ff.Exclude) == 0
+}
+
+func (ff ModifiedLinesFileFilter) MatchesFile(filename string) bool {
+	if len(ff.Exclude) > 0 && anyMatches(ff.Exclude, filename) {
+		return false
+	}
+	if len(ff.Include) > 0 && !anyMatches(ff.Include, filename) {
+		return false
+	}
+	return true
 }
 
 type CompareOp uint8
@@ -478,14 +476,12 @@ func (exp *ComparisonExpr) UnmarshalText(text []byte) error {
 }
 
 func (pred *ModifiedLines) Evaluate(ctx context.Context, prctx pull.Context) (*common.PredicateResult, error) {
-	_, span := tracing.Tracer.Start(ctx, "ModifiedLines.Evaluate")
-	defer span.End()
-
 	files, err := prctx.ChangedFiles()
 
 	predicateResult := common.PredicateResult{
 		ValuePhrase:     "file modifications",
-		ConditionPhrase: "meet the modification conditions",
+		ConditionPhrase: "meet",
+		ConditionsMap:   make(map[string][]string),
 	}
 
 	if err != nil {
@@ -494,39 +490,67 @@ func (pred *ModifiedLines) Evaluate(ctx context.Context, prctx pull.Context) (*c
 
 	var additions, deletions int64
 	for _, f := range files {
+		if !pred.Files.MatchesFile(f.Filename) {
+			continue
+		}
 		additions += int64(f.Additions)
 		deletions += int64(f.Deletions)
 	}
 
+	if len(pred.Files.Include) > 0 {
+		predicateResult.ConditionsMap["in files matching"] = getPathStrings(pred.Files.Include)
+	}
+	if len(pred.Files.Exclude) > 0 {
+		predicateResult.ConditionsMap["excluding files matching"] = getPathStrings(pred.Files.Exclude)
+	}
+
+	const conditionKey = "the modification conditions"
+
 	if !pred.Additions.IsEmpty() {
-		predicateResult.Values = []string{fmt.Sprintf("+%d", additions)}
-		predicateResult.ConditionValues = []string{fmt.Sprintf("added lines %s", pred.Additions.String())}
+		value := fmt.Sprintf("+%d", additions)
+		cond := fmt.Sprintf("added lines %s", pred.Additions.String())
+
 		if pred.Additions.Evaluate(additions) {
+			predicateResult.Values = []string{value}
+			predicateResult.ConditionsMap[conditionKey] = []string{cond}
 			predicateResult.Satisfied = true
 			return &predicateResult, nil
 		}
+
+		predicateResult.Values = append(predicateResult.Values, value)
+		predicateResult.ConditionsMap[conditionKey] = append(predicateResult.ConditionsMap[conditionKey], cond)
 	}
+
 	if !pred.Deletions.IsEmpty() {
+		value := fmt.Sprintf("-%d", deletions)
+		cond := fmt.Sprintf("deleted lines %s", pred.Deletions.String())
+
 		if pred.Deletions.Evaluate(deletions) {
-			predicateResult.Values = []string{fmt.Sprintf("-%d", deletions)}
-			predicateResult.ConditionValues = []string{fmt.Sprintf("deleted lines %s", pred.Deletions.String())}
+			predicateResult.Values = []string{value}
+			predicateResult.ConditionsMap[conditionKey] = []string{cond}
 			predicateResult.Satisfied = true
 			return &predicateResult, nil
 		}
-		predicateResult.Values = append(predicateResult.Values, fmt.Sprintf("-%d", deletions))
-		predicateResult.ConditionValues = append(predicateResult.ConditionValues, fmt.Sprintf("deleted lines %s", pred.Deletions.String()))
+
+		predicateResult.Values = append(predicateResult.Values, value)
+		predicateResult.ConditionsMap[conditionKey] = append(predicateResult.ConditionsMap[conditionKey], cond)
 	}
+
 	if !pred.Total.IsEmpty() {
+		value := fmt.Sprintf("total %d", additions+deletions)
+		cond := fmt.Sprintf("total modifications %s", pred.Total.String())
+
 		if pred.Total.Evaluate(additions + deletions) {
-			predicateResult.Values = []string{fmt.Sprintf("total %d", additions+deletions)}
-			predicateResult.ConditionValues = []string{fmt.Sprintf("total modifications %s", pred.Total.String())}
+			predicateResult.Values = []string{value}
+			predicateResult.ConditionsMap[conditionKey] = []string{cond}
 			predicateResult.Satisfied = true
 			return &predicateResult, nil
 		}
-		predicateResult.Values = append(predicateResult.Values, fmt.Sprintf("total %d", additions+deletions))
-		predicateResult.ConditionValues = append(predicateResult.ConditionValues, fmt.Sprintf("total modifications %s", pred.Total.String()))
+
+		predicateResult.Values = append(predicateResult.Values, value)
+		predicateResult.ConditionsMap[conditionKey] = append(predicateResult.ConditionsMap[conditionKey], cond)
 	}
-	predicateResult.Satisfied = false
+
 	return &predicateResult, nil
 }
 

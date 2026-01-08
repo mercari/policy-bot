@@ -20,11 +20,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v72/github"
-	"github.com/palantir/policy-bot/tracing"
+	"github.com/google/go-github/v79/github"
 	"github.com/pkg/errors"
 	"github.com/shurcooL/githubv4"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -133,20 +131,19 @@ type GitHubContext struct {
 	pr     *v4PullRequest
 
 	// cached fields
-	files                []*File
-	commits              []*Commit
-	comments             []*Comment
-	reviews              []*Review
-	reviewers            []*Reviewer
-	collaborators        []*Collaborator
-	permissions          map[string]Permission
-	teams                map[string]Permission
-	membership           map[string]bool
-	statuses             map[string]string
-	labels               []string
-	pushedAt             map[string]time.Time
-	workflowRuns         map[string][]string
-	repoCustomProperties map[string]CustomProperty
+	files                      []*File
+	commits                    []*Commit
+	comments                   []*Comment
+	reviews                    []*Review
+	reviewers                  []*Reviewer
+	collaborators              map[Permission][]*Collaborator
+	permissions                map[string]Permission
+	teams                      map[string]Permission
+	statuses                   map[string]string
+	labels                     []string
+	pushedAt                   map[string]time.Time
+	workflowRuns               map[string][]string
+	repositoryCustomProperties map[string]CustomProperty
 }
 
 // NewGitHubContext creates a new pull.Context that makes GitHub requests to
@@ -200,28 +197,22 @@ func (ghc *GitHubContext) RepositoryName() string {
 }
 
 func (ghc *GitHubContext) RepositoryCustomProperties() (map[string]CustomProperty, error) {
-	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.RepositoryCustomProperties")
-	defer span.End()
-
-	if ghc.repoCustomProperties == nil {
+	if ghc.repositoryCustomProperties == nil {
 		if err := ghc.loadRepositoryCustomProperties(); err != nil {
 			return nil, err
 		}
 	}
 
-	return ghc.repoCustomProperties, nil
+	return ghc.repositoryCustomProperties, nil
 }
 
 func (ghc *GitHubContext) loadRepositoryCustomProperties() error {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.loadRepositoryCustomProperties")
-	defer span.End()
-
-	values, _, err := ghc.client.Repositories.GetAllCustomPropertyValues(ctx, ghc.owner, ghc.repo)
+	values, _, err := ghc.client.Repositories.GetAllCustomPropertyValues(ghc.ctx, ghc.owner, ghc.repo)
 	if err != nil {
 		return errors.Wrap(err, "failed to load repository custom properties")
 	}
 
-	ghc.repoCustomProperties = make(map[string]CustomProperty)
+	ghc.repositoryCustomProperties = make(map[string]CustomProperty)
 	for _, value := range values {
 		var result CustomProperty
 		if value.Value == nil {
@@ -233,7 +224,7 @@ func (ghc *GitHubContext) loadRepositoryCustomProperties() error {
 		} else {
 			return errors.Errorf("unexpected type for custom property %s: %T", value.PropertyName, value.Value)
 		}
-		ghc.repoCustomProperties[value.PropertyName] = result
+		ghc.repositoryCustomProperties[value.PropertyName] = result
 	}
 
 	return nil
@@ -255,9 +246,6 @@ type v4PullRequestWithEditedAt struct {
 }
 
 func (ghc *GitHubContext) Body() (*Body, error) {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Body")
-	defer span.End()
-
 	var q struct {
 		Repository struct {
 			PullRequest v4PullRequestWithEditedAt `graphql:"pullRequest(number: $number)"`
@@ -268,7 +256,7 @@ func (ghc *GitHubContext) Body() (*Body, error) {
 		"name":   githubv4.String(ghc.repo),
 		"number": githubv4.Int(ghc.number),
 	}
-	if err := ghc.v4client.Query(ctx, &q, qvars); err != nil {
+	if err := ghc.v4client.Query(ghc.ctx, &q, qvars); err != nil {
 		return nil, errors.Wrap(err, "failed to load pull request details")
 	}
 	graphqlResponse := &q.Repository.PullRequest
@@ -318,9 +306,6 @@ func (ghc *GitHubContext) Branches() (base string, head string) {
 }
 
 func (ghc *GitHubContext) ChangedFiles() ([]*File, error) {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.ChangedFiles")
-	defer span.End()
-
 	// Check if changed files exceeds the limit
 	if ghc.pr.ChangedFiles > MaxPullRequestFiles {
 		return nil, errors.Errorf("number of changed files (%d) exceeds limit (%d)", ghc.pr.ChangedFiles, MaxPullRequestFiles)
@@ -333,7 +318,7 @@ func (ghc *GitHubContext) ChangedFiles() ([]*File, error) {
 
 		var allFiles []*github.CommitFile
 		for {
-			files, res, err := ghc.client.PullRequests.ListFiles(ctx, ghc.owner, ghc.repo, ghc.number, &opt)
+			files, res, err := ghc.client.PullRequests.ListFiles(ghc.ctx, ghc.owner, ghc.repo, ghc.number, &opt)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to list pull request files")
 			}
@@ -379,13 +364,10 @@ func (ghc *GitHubContext) ChangedFiles() ([]*File, error) {
 }
 
 func (ghc *GitHubContext) Commits() ([]*Commit, error) {
-	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Commits")
-	defer span.End()
-
 	if ghc.commits == nil {
 		err := ghc.loadPagedData()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to load commits")
+			return nil, err
 		}
 	}
 	if len(ghc.commits) >= MaxPullRequestCommits {
@@ -395,9 +377,6 @@ func (ghc *GitHubContext) Commits() ([]*Commit, error) {
 }
 
 func (ghc *GitHubContext) PushedAt(sha string) (time.Time, error) {
-	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.PushedAt")
-	defer span.End()
-
 	repoID := ghc.pr.BaseRepository.DatabaseID
 	if ghc.pushedAt == nil {
 		ghc.pushedAt = make(map[string]time.Time)
@@ -463,9 +442,6 @@ func (ghc *GitHubContext) PushedAt(sha string) (time.Time, error) {
 //
 // The local cache must be initialized before calling tryPushedAt.
 func (ghc *GitHubContext) tryPushedAt(repoID int64, sha string) (time.Time, error) {
-	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.tryPushedAt")
-	defer span.End()
-
 	if t, ok := ghc.pushedAt[sha]; ok {
 		return t, nil
 	}
@@ -482,9 +458,6 @@ func (ghc *GitHubContext) tryPushedAt(repoID int64, sha string) (time.Time, erro
 // is the head of the pull request. A child commit is a commit that has SHA as
 // a parent.
 func (ghc *GitHubContext) nextChildCommit(sha string) (*Commit, error) {
-	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.nextChildCommit")
-	defer span.End()
-
 	if sha == ghc.HeadSHA() {
 		// Optimization: exit early if asked about the head SHA
 		return nil, nil
@@ -506,9 +479,6 @@ func (ghc *GitHubContext) nextChildCommit(sha string) (*Commit, error) {
 }
 
 func (ghc *GitHubContext) Comments() ([]*Comment, error) {
-	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Comments")
-	defer span.End()
-
 	if ghc.comments == nil {
 		if err := ghc.loadPagedData(); err != nil {
 			return nil, err
@@ -518,9 +488,6 @@ func (ghc *GitHubContext) Comments() ([]*Comment, error) {
 }
 
 func (ghc *GitHubContext) Reviews() ([]*Review, error) {
-	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Reviews")
-	defer span.End()
-
 	if ghc.reviews == nil {
 		if err := ghc.loadPagedData(); err != nil {
 			return nil, err
@@ -529,161 +496,135 @@ func (ghc *GitHubContext) Reviews() ([]*Review, error) {
 	return ghc.reviews, nil
 }
 
-func (ghc *GitHubContext) RepositoryCollaborators() ([]*Collaborator, error) {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.RepositoryCollaborators")
-	defer span.End()
-
+func (ghc *GitHubContext) RepositoryCollaborators(minPermission Permission) ([]*Collaborator, error) {
 	if ghc.collaborators == nil {
-		// For reviewer assignment, we need to figure out how each collaborator
-		// gets permissions on the repository. We _should_ be able to do this
-		// by examining the permission sources for each collaborator, but this
-		// API is innaccurate as of 2021-05-06. Specifically:
-		//
-		//   - Organization permissions are not reported correctly
-		//   - Triage/Maintain permissions are not supported
-		//   - Organization owners have both org and repo sources
-		//
-		// But even if this API was correct, it is not available to GitHub App
-		// integrations at this time.
-		//
-		// Instead, query for all collaborators and direct collaborators, then
-		// join that information with team permissions and membership to
-		// produce the final list of collaborators. This is expensive, but
-		// should only be used when assigning user reviewers, in which case
-		// almost all of the calls would have been made anyway.
+		ghc.collaborators = make(map[Permission][]*Collaborator)
+	}
 
-		var q struct {
-			Repository struct {
-				DirectCollaborators struct {
-					PageInfo v4PageInfo
-					Edges    []struct {
-						Permission string
-					}
-					Nodes []v4Actor
-				} `graphql:"direct: collaborators(affiliation: DIRECT, first: 100, after: $directCursor)"`
-				AllCollaborators struct {
-					PageInfo v4PageInfo
-					Edges    []struct {
-						Permission string
-					}
-					Nodes []v4Actor
-				} `graphql:"all: collaborators(affiliation: ALL, first: 100, after: $allCursor)"`
-			} `graphql:"repository(owner: $owner, name: $name)"`
-		}
-		qvars := map[string]interface{}{
-			"owner":        githubv4.String(ghc.owner),
-			"name":         githubv4.String(ghc.repo),
-			"directCursor": (*githubv4.String)(nil),
-			"allCursor":    (*githubv4.String)(nil),
+	if cached, ok := ghc.collaborators[minPermission]; ok {
+		return cached, nil
+	}
+
+	// For reviewer assignment, we need to figure out how each collaborator
+	// gets permissions on the repository. We _should_ be able to do this
+	// by examining the permission sources for each collaborator, but this
+	// API is inaccurate as of 2021-05-06. Specifically:
+	//
+	//   - Organization permissions are not reported correctly
+	//   - Triage/Maintain permissions are not supported
+	//   - Organization owners have both org and repo sources
+	//
+	// But even if this API was correct, it is not available to GitHub App
+	// integrations at this time.
+	//
+	// Instead, query for all collaborators and direct collaborators, then
+	// join that information with team permissions and membership to
+	// produce the final list of collaborators. This is expensive, but
+	// should only be used when assigning user reviewers, in which case
+	// almost all of the calls would have been made anyway.
+
+	directPerms := make(map[string]Permission)
+	directOpts := &github.ListCollaboratorsOptions{
+		Affiliation: "direct",
+		Permission:  minPermission.GitHubString(),
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+	for {
+		users, resp, err := ghc.client.Repositories.ListCollaborators(ghc.ctx, ghc.owner, ghc.repo, directOpts)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to load direct repository collaborators")
 		}
 
-		directPerms := make(map[string]Permission)
-
-		var collaborators []*Collaborator
-		for {
-			complete := 0
-			if err := ghc.v4client.Query(ctx, &q, qvars); err != nil {
-				return nil, errors.Wrap(err, "failed to load repository collaborators")
-			}
-
-			for i, u := range q.Repository.DirectCollaborators.Nodes {
-				edge := q.Repository.DirectCollaborators.Edges[i]
-				name := u.GetV3Login()
-
-				p, err := ParsePermission(edge.Permission)
-				if err != nil {
-					return nil, errors.Wrapf(err, "%s", name)
-				}
-				directPerms[name] = p
-			}
-			if !q.Repository.DirectCollaborators.PageInfo.UpdateCursor(qvars, "directCursor") {
-				complete++
-			}
-
-			for i, u := range q.Repository.AllCollaborators.Nodes {
-				edge := q.Repository.AllCollaborators.Edges[i]
-				name := u.GetV3Login()
-
-				p, err := ParsePermission(edge.Permission)
-				if err != nil {
-					return nil, errors.Wrapf(err, "%s", name)
-				}
-
-				collaborators = append(collaborators, &Collaborator{
-					Name: name,
-					Permissions: []CollaboratorPermission{
-						{Permission: p},
-					},
-				})
-			}
-			if !q.Repository.AllCollaborators.PageInfo.UpdateCursor(qvars, "allCursor") {
-				complete++
-			}
-
-			if complete == 2 {
-				break
-			}
+		for _, u := range users {
+			directPerms[u.GetLogin()] = ParsePermissionMap(u.GetPermissions())
 		}
 
-		teamPerms, err := ghc.Teams()
+		if resp.NextPage == 0 {
+			break
+		}
+		directOpts.Page = resp.NextPage
+	}
+
+	var collaborators []*Collaborator
+	allOpts := &github.ListCollaboratorsOptions{
+		Affiliation: "all",
+		Permission:  minPermission.GitHubString(),
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+	for {
+		users, resp, err := ghc.client.Repositories.ListCollaborators(ghc.ctx, ghc.owner, ghc.repo, allOpts)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to load all repository collaborators")
+		}
+
+		for _, u := range users {
+			collaborators = append(collaborators, &Collaborator{
+				Name: u.GetLogin(),
+				Permissions: []CollaboratorPermission{
+					{Permission: ParsePermissionMap(u.GetPermissions())},
+				},
+			})
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		allOpts.Page = resp.NextPage
+	}
+
+	teamPerms, err := ghc.Teams()
+	if err != nil {
+		return nil, err
+	}
+
+	teamMembership := make(map[string][]string)
+	for team := range teamPerms {
+		members, err := ghc.TeamMembers(ghc.owner + "/" + team)
 		if err != nil {
 			return nil, err
 		}
 
-		teamMembership := make(map[string][]string)
-		for team := range teamPerms {
-			// List full membership instead of testing each collaborator under
-			// the assumption that (teams * members) is much less than the
-			// total number of collaborators, which include those from the org
-			members, err := ghc.TeamMembers(ghc.owner + "/" + team)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, member := range members {
-				teamMembership[member] = append(teamMembership[member], team)
-			}
+		for _, member := range members {
+			teamMembership[member] = append(teamMembership[member], team)
 		}
-
-		fillPermissions := func(c *Collaborator) {
-			overall := c.Permissions[0].Permission // from above, every collaborator has at least one permission
-
-			if dp, ok := directPerms[c.Name]; ok {
-				if dp >= overall {
-					c.Permissions[0].ViaRepo = true
-				} else if dp > PermissionNone {
-					c.Permissions = append(c.Permissions, CollaboratorPermission{
-						Permission: dp,
-						ViaRepo:    true,
-					})
-				}
-			}
-
-			for _, team := range teamMembership[c.Name] {
-				tp := teamPerms[team]
-				if tp >= overall {
-					c.Permissions[0].ViaRepo = true
-				} else if tp > PermissionNone {
-					c.Permissions = append(c.Permissions, CollaboratorPermission{
-						Permission: tp,
-						ViaRepo:    true,
-					})
-				}
-			}
-		}
-
-		for _, c := range collaborators {
-			fillPermissions(c)
-		}
-		ghc.collaborators = collaborators
 	}
-	return ghc.collaborators, nil
+
+	fillPermissions := func(c *Collaborator) {
+		overall := c.Permissions[0].Permission // from above, every collaborator has at least one permission
+
+		if dp, ok := directPerms[c.Name]; ok {
+			if dp >= overall {
+				c.Permissions[0].ViaRepo = true
+			} else if dp > PermissionNone {
+				c.Permissions = append(c.Permissions, CollaboratorPermission{
+					Permission: dp,
+					ViaRepo:    true,
+				})
+			}
+		}
+
+		for _, team := range teamMembership[c.Name] {
+			tp := teamPerms[team]
+			if tp >= overall {
+				c.Permissions[0].ViaRepo = true
+			} else if tp > PermissionNone {
+				c.Permissions = append(c.Permissions, CollaboratorPermission{
+					Permission: tp,
+					ViaRepo:    true,
+				})
+			}
+		}
+	}
+
+	for _, c := range collaborators {
+		fillPermissions(c)
+	}
+
+	ghc.collaborators[minPermission] = collaborators
+	return ghc.collaborators[minPermission], nil
 }
 
 func (ghc *GitHubContext) CollaboratorPermission(user string) (Permission, error) {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.CollaboratorPermission")
-	defer span.End()
-
 	if ghc.permissions == nil {
 		ghc.permissions = make(map[string]Permission)
 	}
@@ -715,7 +656,7 @@ func (ghc *GitHubContext) CollaboratorPermission(user string) (Permission, error
 	// iterate through multiple users before we find the one we're looking for.
 	var perm Permission
 	for {
-		if err := ghc.v4client.Query(ctx, &q, qvars); err != nil {
+		if err := ghc.v4client.Query(ghc.ctx, &q, qvars); err != nil {
 			return PermissionNone, errors.Wrap(err, "failed to get collaborator permission")
 		}
 		if idx := findUserIndex(user, q.Repository.Collaborators.Nodes); idx >= 0 {
@@ -745,9 +686,6 @@ func findUserIndex(user string, users []v4Actor) int {
 }
 
 func (ghc *GitHubContext) RequestedReviewers() ([]*Reviewer, error) {
-	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.RequestedReviewers")
-	defer span.End()
-
 	if ghc.reviewers == nil {
 		if err := ghc.loadRequestedReviewers(); err != nil {
 			return nil, err
@@ -757,9 +695,6 @@ func (ghc *GitHubContext) RequestedReviewers() ([]*Reviewer, error) {
 }
 
 func (ghc *GitHubContext) loadRequestedReviewers() error {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.loadRequestedReviewers")
-	defer span.End()
-
 	var q struct {
 		Repository struct {
 			PullRequest struct {
@@ -794,7 +729,7 @@ func (ghc *GitHubContext) loadRequestedReviewers() error {
 	reviewers := []*Reviewer{}
 	for {
 		complete := 0
-		if err := ghc.v4client.Query(ctx, &q, qvars); err != nil {
+		if err := ghc.v4client.Query(ghc.ctx, &q, qvars); err != nil {
 			return errors.Wrap(err, "failed to load requested reviewers data")
 		}
 
@@ -821,9 +756,6 @@ func (ghc *GitHubContext) loadRequestedReviewers() error {
 }
 
 func (ghc *GitHubContext) Teams() (map[string]Permission, error) {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Teams")
-	defer span.End()
-
 	if ghc.teams == nil {
 		opt := &github.ListOptions{
 			PerPage: 100,
@@ -831,7 +763,7 @@ func (ghc *GitHubContext) Teams() (map[string]Permission, error) {
 
 		allTeams := make(map[string]Permission)
 		for {
-			teams, resp, err := listTeams(ctx, ghc.client, ghc.owner, ghc.repo, opt)
+			teams, resp, err := listTeams(ghc.ctx, ghc.client, ghc.owner, ghc.repo, opt)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to list teams page %d", opt.Page)
 			}
@@ -849,9 +781,6 @@ func (ghc *GitHubContext) Teams() (map[string]Permission, error) {
 }
 
 func (ghc *GitHubContext) LatestStatuses() (map[string]string, error) {
-	_, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.LatestStatuses")
-	defer span.End()
-
 	if ghc.statuses == nil {
 		statuses, err := ghc.getStatuses()
 		if err != nil {
@@ -874,16 +803,13 @@ func (ghc *GitHubContext) LatestStatuses() (map[string]string, error) {
 }
 
 func (ghc *GitHubContext) getStatuses() (map[string]string, error) {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.getStatuses")
-	defer span.End()
-
 	opt := &github.ListOptions{
 		PerPage: 100,
 	}
 	// get all pages of results
 	statuses := make(map[string]string)
 	for {
-		combinedStatus, resp, err := ghc.client.Repositories.GetCombinedStatus(ctx, ghc.owner, ghc.repo, ghc.HeadSHA(), opt)
+		combinedStatus, resp, err := ghc.client.Repositories.GetCombinedStatus(ghc.ctx, ghc.owner, ghc.repo, ghc.HeadSHA(), opt)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get statuses for page %d", opt.Page)
 		}
@@ -899,9 +825,6 @@ func (ghc *GitHubContext) getStatuses() (map[string]string, error) {
 }
 
 func (ghc *GitHubContext) getCheckStatuses() (map[string]string, error) {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.getCheckStatuses")
-	defer span.End()
-
 	opt := &github.ListCheckRunsOptions{
 		ListOptions: github.ListOptions{
 			PerPage: 100,
@@ -910,7 +833,7 @@ func (ghc *GitHubContext) getCheckStatuses() (map[string]string, error) {
 	// get all pages of results
 	statuses := make(map[string]string)
 	for {
-		checkRuns, resp, err := ghc.client.Checks.ListCheckRunsForRef(ctx, ghc.owner, ghc.repo, ghc.HeadSHA(), opt)
+		checkRuns, resp, err := ghc.client.Checks.ListCheckRunsForRef(ghc.ctx, ghc.owner, ghc.repo, ghc.HeadSHA(), opt)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get check runs for page %d", opt.Page)
 		}
@@ -935,9 +858,6 @@ func (ghc *GitHubContext) getCheckStatuses() (map[string]string, error) {
 }
 
 func (ghc *GitHubContext) LatestWorkflowRuns() (map[string][]string, error) {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.LatestWorkflowRuns")
-	defer span.End()
-
 	if ghc.workflowRuns != nil {
 		return ghc.workflowRuns, nil
 	}
@@ -979,7 +899,7 @@ func (ghc *GitHubContext) LatestWorkflowRuns() (map[string][]string, error) {
 	// the workflow to be considered successful.
 	runsWithDate := make(map[string]map[string]*github.WorkflowRun)
 	for {
-		runs, resp, err := ghc.client.Actions.ListRepositoryWorkflowRuns(ctx, ghc.owner, ghc.repo, opt)
+		runs, resp, err := ghc.client.Actions.ListRepositoryWorkflowRuns(ghc.ctx, ghc.owner, ghc.repo, opt)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get workflow runs for page %d", opt.Page)
 		}
@@ -1024,11 +944,8 @@ func (ghc *GitHubContext) LatestWorkflowRuns() (map[string][]string, error) {
 }
 
 func (ghc *GitHubContext) Labels() ([]string, error) {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.Labels")
-	defer span.End()
-
 	if ghc.labels == nil {
-		issueLabels, _, err := ghc.client.Issues.ListLabelsByIssue(ctx, ghc.owner, ghc.repo, ghc.number, &github.ListOptions{
+		issueLabels, _, err := ghc.client.Issues.ListLabelsByIssue(ghc.ctx, ghc.owner, ghc.repo, ghc.number, &github.ListOptions{
 			Page:    0,
 			PerPage: 100,
 		})
@@ -1046,22 +963,25 @@ func (ghc *GitHubContext) Labels() ([]string, error) {
 }
 
 func (ghc *GitHubContext) loadPagedData() error {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.loadPagedData")
-	defer span.End()
-
-	// Checked that the GraphQL query has cost 1: setting all to 100 will result in cost 2
+	// This query is tuned to use a single GraphQL rate limit point per
+	// execution. For most PRs, this means loading all commits, comments, and
+	// reviews in one request with the minimal possible cost.
+	//
+	// Before adjusting any of the page sizes or returned properties, verify
+	// that the query cost does not increase. For example, setting all of the
+	// page sizes to 100 increases the query cost to 2 as of 2025-11-25.
 	var q struct {
 		Repository struct {
 			PullRequest struct {
 				Commits struct {
 					PageInfo v4PageInfo
 					Nodes    []*v4PullRequestCommit
-				} `graphql:"commits(first: 50, after: $commitCursor)"`
+				} `graphql:"commits(first: 80, after: $commitCursor)"`
 
 				Comments struct {
 					PageInfo v4PageInfo
 					Nodes    []v4IssueComment
-				} `graphql:"comments(first: 50, after: $commentCursor)"`
+				} `graphql:"comments(first: 100, after: $commentCursor)"`
 
 				Reviews struct {
 					PageInfo v4PageInfo
@@ -1069,13 +989,6 @@ func (ghc *GitHubContext) loadPagedData() error {
 				} `graphql:"reviews(first: 50, after: $reviewCursor, states: [APPROVED, CHANGES_REQUESTED, COMMENTED])"`
 			} `graphql:"pullRequest(number: $number)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
-
-		RateLimit struct {
-			Cost      int
-			Limit     int
-			Remaining int
-			Used      int
-		}
 	}
 	qvars := map[string]interface{}{
 		"owner":  githubv4.String(ghc.owner),
@@ -1090,18 +1003,12 @@ func (ghc *GitHubContext) loadPagedData() error {
 	rawCommits := []*v4PullRequestCommit{}
 	comments := []*Comment{}
 	reviews := []*Review{}
+
 	for {
 		complete := 0
-		if err := ghc.v4client.Query(ctx, &q, qvars); err != nil {
+		if err := ghc.v4client.Query(ghc.ctx, &q, qvars); err != nil {
 			return errors.Wrap(err, "failed to load pull request data")
 		}
-
-		span.SetAttributes(
-			attribute.Int("github.rate_limit.cost", q.RateLimit.Cost),
-			attribute.Int("github.rate_limit.limit", q.RateLimit.Limit),
-			attribute.Int("github.rate_limit.remaining", q.RateLimit.Remaining),
-			attribute.Int("github.rate_limit.used", q.RateLimit.Used),
-		)
 
 		rawCommits = append(rawCommits, q.Repository.PullRequest.Commits.Nodes...)
 		if !q.Repository.PullRequest.Commits.PageInfo.UpdateCursor(qvars, "commitCursor") {
@@ -1166,9 +1073,6 @@ func (ghc *GitHubContext) processCommits(rawCommits []*v4PullRequestCommit) ([]*
 }
 
 func (ghc *GitHubContext) loadPushedAt(sha string) (time.Time, error) {
-	ctx, span := tracing.Tracer.Start(ghc.ctx, "GitHubContext.loadPushedAt")
-	defer span.End()
-
 	opt := &github.ListOptions{
 		PerPage: 100,
 	}
@@ -1177,7 +1081,7 @@ func (ghc *GitHubContext) loadPushedAt(sha string) (time.Time, error) {
 	// last item on the last page is the oldest status, which must have been
 	// posted after someone pushed the commit.
 	for {
-		statuses, resp, err := ghc.client.Repositories.ListStatuses(ctx, ghc.owner, ghc.repo, sha, opt)
+		statuses, resp, err := ghc.client.Repositories.ListStatuses(ghc.ctx, ghc.owner, ghc.repo, sha, opt)
 		if err != nil {
 			return time.Time{}, errors.Wrapf(err, "failed to list statuses for page %d", opt.Page)
 		}

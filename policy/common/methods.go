@@ -30,9 +30,65 @@ type Methods struct {
 	BodyPatterns                []Regexp `yaml:"body_patterns,omitempty"`
 
 	// If GithubReview is true, GithubReviewState is the state a review must
-	// have to be considered a candidated. It is currently excluded from
-	// serialized forms and should be set by the application.
-	GithubReviewState pull.ReviewState `yaml:"-" json:"-"`
+	// have to be considered a candidate. It is set after parsing based on the
+	// context in which Methods is used, rather than by the YAML configuration.
+	GithubReviewState pull.ReviewState `yaml:"-"`
+
+	// Defaults contains default method values for this rule, set by the policy
+	// or the server. The field is populated after parsing the YAML
+	// configuration. If nil, unset fields default to the zero value of their
+	// element type, unless otherwise noted.
+	Defaults *Methods `yaml:"-"`
+}
+
+func (m *Methods) GetComments() []string {
+	if m.Comments == nil {
+		if m.Defaults != nil {
+			return m.Defaults.GetComments()
+		}
+		return nil
+	}
+	return m.Comments
+}
+
+func (m *Methods) GetCommentPatterns() []Regexp {
+	if m.CommentPatterns == nil {
+		if m.Defaults != nil {
+			return m.Defaults.GetCommentPatterns()
+		}
+		return nil
+	}
+	return m.CommentPatterns
+}
+
+func (m *Methods) IsGithubReview() bool {
+	if m.GithubReview == nil {
+		if m.Defaults != nil {
+			return m.Defaults.IsGithubReview()
+		}
+		return false
+	}
+	return *m.GithubReview
+}
+
+func (m *Methods) GetGithubReviewCommentPatterns() []Regexp {
+	if m.GithubReviewCommentPatterns == nil {
+		if m.Defaults != nil {
+			return m.Defaults.GetGithubReviewCommentPatterns()
+		}
+		return nil
+	}
+	return m.GithubReviewCommentPatterns
+}
+
+func (m *Methods) GetBodyPatterns() []Regexp {
+	if m.BodyPatterns == nil {
+		if m.Defaults != nil {
+			return m.Defaults.GetBodyPatterns()
+		}
+		return nil
+	}
+	return m.BodyPatterns
 }
 
 type CandidateType string
@@ -65,7 +121,7 @@ func (cs CandidatesByCreationTime) Less(i, j int) bool {
 func (m *Methods) Candidates(ctx context.Context, prctx pull.Context) ([]*Candidate, error) {
 	var candidates []*Candidate
 
-	if len(m.Comments) > 0 || len(m.CommentPatterns) > 0 {
+	if len(m.GetComments()) > 0 || len(m.GetCommentPatterns()) > 0 {
 		comments, err := prctx.Comments()
 		if err != nil {
 			return nil, err
@@ -83,7 +139,7 @@ func (m *Methods) Candidates(ctx context.Context, prctx pull.Context) ([]*Candid
 		}
 	}
 
-	if len(m.BodyPatterns) > 0 {
+	if len(m.GetBodyPatterns()) > 0 {
 		prBody, err := prctx.Body()
 		if err != nil {
 			return nil, err
@@ -97,7 +153,7 @@ func (m *Methods) Candidates(ctx context.Context, prctx pull.Context) ([]*Candid
 		}
 	}
 
-	if m.GithubReview != nil && *m.GithubReview || len(m.GithubReviewCommentPatterns) > 0 {
+	if m.IsGithubReview() || len(m.GetGithubReviewCommentPatterns()) > 0 {
 		reviews, err := prctx.Reviews()
 		if err != nil {
 			return nil, err
@@ -105,8 +161,8 @@ func (m *Methods) Candidates(ctx context.Context, prctx pull.Context) ([]*Candid
 
 		for _, r := range reviews {
 			if r.State == m.GithubReviewState {
-				if len(m.GithubReviewCommentPatterns) > 0 {
-					if m.githubReviewCommentMatches(r.Body) {
+				if len(m.GetGithubReviewCommentPatterns()) > 0 {
+					if m.GithubReviewCommentMatches(r.Body) {
 						candidates = append(candidates, &Candidate{
 							Type:         ReviewCandidate,
 							ReviewID:     r.ID,
@@ -149,12 +205,12 @@ func deduplicateCandidates(all []*Candidate) []*Candidate {
 }
 
 func (m *Methods) CommentMatches(commentBody string) bool {
-	for _, comment := range m.Comments {
+	for _, comment := range m.GetComments() {
 		if strings.Contains(commentBody, comment) {
 			return true
 		}
 	}
-	for _, pattern := range m.CommentPatterns {
+	for _, pattern := range m.GetCommentPatterns() {
 		if pattern.Matches(commentBody) {
 			return true
 		}
@@ -162,8 +218,8 @@ func (m *Methods) CommentMatches(commentBody string) bool {
 	return false
 }
 
-func (m *Methods) githubReviewCommentMatches(commentBody string) bool {
-	for _, pattern := range m.GithubReviewCommentPatterns {
+func (m *Methods) GithubReviewCommentMatches(commentBody string) bool {
+	for _, pattern := range m.GetGithubReviewCommentPatterns() {
 		if pattern.Matches(commentBody) {
 			return true
 		}
@@ -172,7 +228,7 @@ func (m *Methods) githubReviewCommentMatches(commentBody string) bool {
 }
 
 func (m *Methods) BodyMatches(prBody string) bool {
-	for _, pattern := range m.BodyPatterns {
+	for _, pattern := range m.GetBodyPatterns() {
 		if pattern.Matches(prBody) {
 			return true
 		}

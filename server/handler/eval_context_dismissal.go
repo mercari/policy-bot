@@ -45,7 +45,7 @@ func (ec *EvalContext) dismissStaleReviewsForResult(ctx context.Context, result 
 			continue
 		}
 
-		logger.Info().Ctx(ctx).Str("reason", d.Reason).Msgf("Dismissing stale review %s", d.Candidate.ReviewID)
+		logger.Info().Str("reason", d.Reason).Msgf("Dismissing stale review %s", d.Candidate.ReviewID)
 		if err := dismissPullRequestReview(ctx, ec.V4Client, d.Candidate.ReviewID, d.Reason); err != nil {
 			return err
 		}

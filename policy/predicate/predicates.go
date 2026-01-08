@@ -50,7 +50,10 @@ type Predicates struct {
 	HasValidSignaturesBy     *HasValidSignaturesBy     `yaml:"has_valid_signatures_by,omitempty"`
 	HasValidSignaturesByKeys *HasValidSignaturesByKeys `yaml:"has_valid_signatures_by_keys,omitempty"`
 
-	CustomProperties *[]CustomProperty `yaml:"custom_properties,omitempty"`
+	CustomPropertyIsNull        *CustomPropertyIsNull        `yaml:"custom_property_is_null,omitempty"`
+	CustomPropertyIsNotNull     *CustomPropertyIsNotNull     `yaml:"custom_property_is_not_null,omitempty"`
+	CustomPropertyMatchesAnyOf  *CustomPropertyMatchesAnyOf  `yaml:"custom_property_matches_any_of,omitempty"`
+	CustomPropertyMatchesNoneOf *CustomPropertyMatchesNoneOf `yaml:"custom_property_matches_none_of,omitempty"`
 }
 
 func (p Predicates) IsZero() bool {
@@ -142,10 +145,17 @@ func (p *Predicates) Predicates() []Predicate {
 		ps = append(ps, Predicate(p.HasValidSignaturesByKeys))
 	}
 
-	if p.CustomProperties != nil {
-		for _, customProperty := range *p.CustomProperties {
-			ps = append(ps, Predicate(customProperty))
-		}
+	if p.CustomPropertyIsNotNull != nil {
+		ps = append(ps, Predicate(p.CustomPropertyIsNotNull))
+	}
+	if p.CustomPropertyIsNull != nil {
+		ps = append(ps, Predicate(p.CustomPropertyIsNull))
+	}
+	if p.CustomPropertyMatchesAnyOf != nil {
+		ps = append(ps, Predicate(p.CustomPropertyMatchesAnyOf))
+	}
+	if p.CustomPropertyMatchesNoneOf != nil {
+		ps = append(ps, Predicate(p.CustomPropertyMatchesNoneOf))
 	}
 
 	return ps

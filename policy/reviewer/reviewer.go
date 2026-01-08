@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sort"
 
 	"github.com/palantir/policy-bot/policy/common"
@@ -123,7 +124,7 @@ func selectRandomUsers(n int, users []string, r *rand.Rand) []string {
 }
 
 func selectTeamMembers(prctx pull.Context, allTeams []string) (map[string][]string, error) {
-	var allTeamsMembers = make(map[string][]string)
+	allTeamsMembers := make(map[string][]string)
 	for _, team := range allTeams {
 		teamMembers, err := prctx.TeamMembers(team)
 		if err != nil {
@@ -204,7 +205,7 @@ func selectTeamReviewers(ctx context.Context, prctx pull.Context, selection *Sel
 		}
 	}
 
-	logger.Debug().Ctx(ctx).Msgf("Requesting %d teams for review", len(teams))
+	logger.Debug().Msgf("Requesting %d teams for review", len(teams))
 	selection.Teams = append(selection.Teams, teams...)
 	return nil
 }
@@ -218,10 +219,10 @@ func selectUserReviewers(ctx context.Context, prctx pull.Context, selection *Sel
 	}
 
 	if len(result.ReviewRequestRule.Teams) > 0 {
-		logger.Debug().Ctx(ctx).Msg("Selecting from teams for review")
+		logger.Debug().Msg("Selecting from teams for review")
 		teamsToUsers, err := selectTeamMembers(prctx, result.ReviewRequestRule.Teams)
 		if err != nil {
-			logger.Warn().Ctx(ctx).Err(err).Msgf("failed to get member listing for teams, skipping team member selection")
+			logger.Warn().Err(err).Msgf("failed to get member listing for teams, skipping team member selection")
 		}
 		for _, users := range teamsToUsers {
 			for _, user := range users {
@@ -231,23 +232,27 @@ func selectUserReviewers(ctx context.Context, prctx pull.Context, selection *Sel
 	}
 
 	if len(result.ReviewRequestRule.Organizations) > 0 {
-		logger.Debug().Ctx(ctx).Msg("Selecting from organizations for review")
+		logger.Debug().Msg("Selecting from organizations for review")
 		orgMembers, err := selectOrgMembers(prctx, result.ReviewRequestRule.Organizations)
 		if err != nil {
-			logger.Warn().Ctx(ctx).Err(err).Msg("failed to get member listing for org, skipping org member selection")
+			logger.Warn().Err(err).Msg("failed to get member listing for org, skipping org member selection")
 		}
 		for _, user := range orgMembers {
 			allUsers[user] = struct{}{}
 		}
 	}
 
-	collaborators, err := prctx.RepositoryCollaborators()
+	minPerm := pull.PermissionNone
+	if len(result.ReviewRequestRule.Permissions) > 0 {
+		minPerm = slices.Min(result.ReviewRequestRule.Permissions)
+	}
+	collaborators, err := prctx.RepositoryCollaborators(minPerm)
 	if err != nil {
 		return errors.Wrap(err, "failed to list repository collaborators")
 	}
 
 	if len(result.ReviewRequestRule.Permissions) > 0 {
-		logger.Debug().Ctx(ctx).Msg("Selecting from collaborators by permission for review")
+		logger.Debug().Msg("Selecting from collaborators by permission for review")
 		for _, c := range collaborators {
 			for _, cp := range c.Permissions {
 				if cp.ViaRepo && requestsPermission(result, cp.Permission) {
@@ -259,20 +264,20 @@ func selectUserReviewers(ctx context.Context, prctx pull.Context, selection *Sel
 
 	possibleReviewers := getPossibleReviewers(prctx, allUsers, collaborators)
 	if len(possibleReviewers) == 0 {
-		logger.Debug().Ctx(ctx).Msg("Found 0 eligible reviewers; skipping review request")
+		logger.Debug().Msg("Found 0 eligible reviewers; skipping review request")
 		return nil
 	}
 
 	switch result.ReviewRequestRule.Mode {
 	case common.RequestModeAllUsers:
-		logger.Debug().Ctx(ctx).Msgf("Found %d eligible reviewers; selecting all", len(possibleReviewers))
+		logger.Debug().Msgf("Found %d eligible reviewers; selecting all", len(possibleReviewers))
 		selection.Users = append(selection.Users, possibleReviewers...)
 
 	case common.RequestModeRandomUsers:
 		count := result.ReviewRequestRule.RequestedCount
 		selectedUsers := selectRandomUsers(count, possibleReviewers, r)
 
-		logger.Debug().Ctx(ctx).Msgf("Found %d eligible reviewers; randomly selecting %d", len(possibleReviewers), count)
+		logger.Debug().Msgf("Found %d eligible reviewers; randomly selecting %d", len(possibleReviewers), count)
 		selection.Users = append(selection.Users, selectedUsers...)
 	}
 	return nil

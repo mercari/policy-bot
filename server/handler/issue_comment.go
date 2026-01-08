@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v79/github"
 	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/palantir/policy-bot/policy"
 	"github.com/palantir/policy-bot/policy/common"
@@ -76,7 +76,7 @@ func (h *IssueComment) Handle(ctx context.Context, eventType, deliveryID string,
 
 	switch {
 	case evalCtx.Config.LoadError != nil || evalCtx.Config.ParseError != nil:
-		logger.Warn().Ctx(ctx).Str(LogKeyAudit, "issue_comment").Msg("Skipping tampering check because the policy is not valid")
+		logger.Warn().Str(LogKeyAudit, "issue_comment").Msg("Skipping tampering check because the policy is not valid")
 	case evalCtx.Config.Config != nil:
 		tampered := h.detectAndLogTampering(ctx, evalCtx, event)
 		if tampered {
@@ -93,7 +93,7 @@ func (h *IssueComment) Handle(ctx context.Context, eventType, deliveryID string,
 	}
 
 	if !h.affectsApproval(event, evalCtx.Config.Config) {
-		logger.Debug().Ctx(ctx).Msg("Skipping evaluation because this comment does not impact approval")
+		logger.Debug().Msg("Skipping evaluation because this comment does not impact approval")
 		return nil
 	}
 
@@ -121,13 +121,13 @@ func (h *IssueComment) detectAndLogTampering(ctx context.Context, evalCtx *EvalC
 
 	if h.affectsApproval(event, evalCtx.Config.Config) {
 		msg := fmt.Sprintf("Entity %s edited approval comment by %s", eventAuthor, commentAuthor)
-		logger.Warn().Ctx(ctx).Str(LogKeyAudit, "issue_comment").Msg(msg)
+		logger.Warn().Str(LogKeyAudit, "issue_comment").Msg(msg)
 
 		evalCtx.PostStatus(ctx, "failure", msg)
 		return true
 	}
 
-	logger.Warn().Ctx(ctx).Str(LogKeyAudit, "issue_comment").Msgf("The comment_editor=%s is not the author=%s", eventAuthor, commentAuthor)
+	logger.Warn().Str(LogKeyAudit, "issue_comment").Msgf("The comment_editor=%s is not the author=%s", eventAuthor, commentAuthor)
 	return true
 }
 

@@ -20,7 +20,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v79/github"
 	"github.com/palantir/policy-bot/policy/common"
 	"github.com/palantir/policy-bot/policy/reviewer"
 	"github.com/palantir/policy-bot/pull"
@@ -44,11 +44,11 @@ func (ec *EvalContext) requestReviewsForResult(ctx context.Context, trigger comm
 	}
 
 	if reqs := reviewer.FindRequests(&result); len(reqs) > 0 {
-		logger.Debug().Ctx(ctx).Msgf("Found %d pending rules with review requests enabled", len(reqs))
+		logger.Debug().Msgf("Found %d pending rules with review requests enabled", len(reqs))
 		return ec.requestReviews(ctx, reqs)
 	}
 
-	logger.Debug().Ctx(ctx).Msgf("No pending rules have review requests enabled, skipping reviewer assignment")
+	logger.Debug().Msgf("No pending rules have review requests enabled, skipping reviewer assignment")
 	return nil
 }
 
@@ -67,7 +67,7 @@ func (ec *EvalContext) requestReviews(ctx context.Context, reqs []*common.Result
 	}
 
 	if selection.IsEmpty() {
-		logger.Debug().Ctx(ctx).Msg("No eligible users or teams found for review")
+		logger.Debug().Msg("No eligible users or teams found for review")
 		return nil
 	}
 
@@ -82,7 +82,7 @@ func (ec *EvalContext) requestReviews(ctx context.Context, reqs []*common.Result
 	// Use the global random source instead of the per-PR source so that two
 	// events for the same PR don't wait for the same amount of time.
 	delay := time.Duration(rand.Intn(maxDelayMillis)) * time.Millisecond
-	logger.Debug().Ctx(ctx).Msgf("Waiting for %s to spread out reviewer processing", delay)
+	logger.Debug().Msgf("Waiting for %s to spread out reviewer processing", delay)
 	time.Sleep(delay)
 
 	// Get existing reviewers _after_ computing the selection and sleeping in
@@ -120,7 +120,7 @@ func (ec *EvalContext) requestReviews(ctx context.Context, reqs []*common.Result
 
 	if diff := selection.Difference(reviewers); !diff.IsEmpty() {
 		req := selectionToReviewersRequest(diff)
-		logger.Debug().Ctx(ctx).
+		logger.Debug().
 			Strs("users", req.Reviewers).
 			Strs("teams", req.TeamReviewers).
 			Msgf("Requesting reviews from %d users and %d teams", len(req.Reviewers), len(req.TeamReviewers))
@@ -133,7 +133,7 @@ func (ec *EvalContext) requestReviews(ctx context.Context, reqs []*common.Result
 		return errors.Wrap(err, "failed to request reviewers")
 	}
 
-	logger.Debug().Ctx(ctx).Msg("All selected reviewers are already assigned or were explicitly removed")
+	logger.Debug().Msg("All selected reviewers are already assigned or were explicitly removed")
 	return nil
 }
 

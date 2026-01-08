@@ -23,12 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v79/github"
 	"github.com/palantir/go-githubapp/appconfig"
 	"github.com/palantir/policy-bot/policy"
-	"github.com/palantir/policy-bot/tracing"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v2"
 )
 
@@ -139,13 +136,9 @@ func (cf *ConfigFetcher) configForSharedRepository(ctx context.Context, client *
 }
 
 func (cf *ConfigFetcher) ConfigForSharedRepository(ctx context.Context, client *github.Client, owner string) FetchedConfig {
-	ctx, span := tracing.Tracer.Start(ctx, "ConfigFetcher.ConfigForSharedRepository")
-	defer span.End()
-
-	config, cached, err := cf.sharedConfigCache.GetOrUpdate(func() (*FetchedConfig, error) {
+	config, _, err := cf.sharedConfigCache.GetOrUpdate(func() (*FetchedConfig, error) {
 		return cf.configForSharedRepository(ctx, client, owner)
 	})
-	span.SetAttributes(attribute.Bool("cache.hit", cached))
 
 	if err != nil {
 		return FetchedConfig{LoadError: err}
@@ -154,14 +147,6 @@ func (cf *ConfigFetcher) ConfigForSharedRepository(ctx context.Context, client *
 }
 
 func (cf *ConfigFetcher) ConfigForRepositoryBranch(ctx context.Context, client *github.Client, owner, repository, branch string) FetchedConfig {
-	ctx, span := tracing.Tracer.Start(ctx, "ConfigFetcher.ConfigForRepositoryBranch",
-		trace.WithAttributes(
-			attribute.String("owner", owner),
-			attribute.String("repository", repository),
-			attribute.String("branch", branch),
-		))
-	defer span.End()
-
 	if cf.Options.ForceSharedPolicy {
 		return cf.ConfigForSharedRepository(ctx, client, owner)
 	}
