@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v79/github"
+	"github.com/google/go-github/v82/github"
 	"github.com/pkg/errors"
 	"github.com/shurcooL/githubv4"
 )
@@ -932,15 +932,14 @@ func (ghc *GitHubContext) LatestWorkflowRuns() (map[string][]string, error) {
 		}
 		opt.Page = resp.NextPage
 	}
-	workflowRuns := make(map[string][]string, len(runsWithDate))
 
+	ghc.workflowRuns = make(map[string][]string, len(runsWithDate))
 	for path, eventRuns := range runsWithDate {
 		for _, run := range eventRuns {
-			workflowRuns[path] = append(workflowRuns[path], run.GetConclusion())
+			ghc.workflowRuns[path] = append(ghc.workflowRuns[path], run.GetConclusion())
 		}
 	}
-
-	return workflowRuns, nil
+	return ghc.workflowRuns, nil
 }
 
 func (ghc *GitHubContext) Labels() ([]string, error) {

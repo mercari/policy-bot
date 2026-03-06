@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-github/v79/github"
+	"github.com/google/go-github/v82/github"
 	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -683,6 +683,13 @@ func TestLatestWorkflowRuns(t *testing.T) {
 	assert.ElementsMatch(t, runs[".github/workflows/a.yml"], []string{"success", "skipped"}, "incorrect conclusion for workflow run a")
 	assert.ElementsMatch(t, runs[".github/workflows/b.yml"], []string{"failure"}, "incorrect conclusion for workflow run b")
 	assert.ElementsMatch(t, runs[".github/workflows/c.yml"], []string{"cancelled"}, "incorrect conclusion for workflow run c")
+	assert.Equal(t, 2, runsRule.Count, "incorrect http request count")
+
+	// verify that workflow runs are cached
+	runs, err = ctx.LatestWorkflowRuns()
+	require.NoError(t, err)
+
+	assert.Len(t, runs, 3, "incorrect number of workflow runs")
 	assert.Equal(t, 2, runsRule.Count, "incorrect http request count")
 }
 

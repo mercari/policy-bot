@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/go-github/v79/github"
+	"github.com/google/go-github/v82/github"
 	"github.com/palantir/policy-bot/policy"
 	"github.com/palantir/policy-bot/policy/common"
 	"github.com/palantir/policy-bot/pull"
