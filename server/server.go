@@ -170,6 +170,7 @@ func New(c *Config) (*Server, error) {
 				policyPaths,
 				appconfig.WithOwnerDefault(*c.Options.SharedRepository, sharedPolicyPaths),
 			),
+			Options: c.Options,
 		},
 
 		AppName: app.GetSlug(),
