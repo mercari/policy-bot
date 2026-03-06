@@ -103,7 +103,7 @@ jobs:
       run: ./godelw docker build --verbose
 
     - name: Archive distribution
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: dist
         path: |
@@ -135,9 +135,16 @@ jobs:
 
   ci-all:
     runs-on: ubuntu-latest
+    if: ${{ !cancelled() }}
     needs:
       - Verify
       - Dist
     steps:
-    - name: Complete
-      run: exit 0
+    - name: Check required job results
+      run: |
+        if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" == "true" ]]; then
+          echo "One or more required jobs did not succeed"
+          echo '${{ toJSON(needs) }}'
+          exit 1
+        fi
+        echo "All required jobs succeeded"
