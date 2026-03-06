@@ -26,3 +26,12 @@ func anyMatches(re []common.Regexp, s string) bool {
 	}
 	return false
 }
+
+func anyGlobMatches(patterns []common.Glob, s string) bool {
+	for _, p := range patterns {
+		if p.Matches(s) {
+			return true
+		}
+	}
+	return false
+}

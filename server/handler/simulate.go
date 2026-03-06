@@ -37,11 +37,12 @@ type Simulate struct {
 // SimulationResponse is the response returned from Simulate, this is a trimmed down version of common.Result with json
 // tags. This struct and the newSimulationResponse constructor can be extended to include extra content from common.Result.
 type SimulationResponse struct {
-	Name              string `json:"name"`
-	Description       string `json:"description:"`
-	StatusDescription string `json:"status_description"`
-	Status            string `json:"status"`
-	Error             string `json:"error"`
+	Name              string                `json:"name"`
+	Description       string                `json:"description"`
+	StatusDescription string                `json:"status_description"`
+	Status            string                `json:"status"`
+	Error             string                `json:"error"`
+	Children          []*SimulationResponse `json:"children,omitempty"`
 }
 
 type ErrorResponse struct {
@@ -174,9 +175,21 @@ func newSimulationResponse(result *common.Result) *SimulationResponse {
 		response.Description = result.Description
 		response.StatusDescription = result.StatusDescription
 		response.Status = result.Status.String()
+		response.Children = buildChildren(result.Children)
 	}
 
 	return &response
+}
+
+func buildChildren(children []*common.Result) []*SimulationResponse {
+	if len(children) == 0 {
+		return nil
+	}
+	result := make([]*SimulationResponse, len(children))
+	for i, child := range children {
+		result[i] = newSimulationResponse(child)
+	}
+	return result
 }
 
 func writeAPIError(w http.ResponseWriter, code int, message string) error {
