@@ -95,9 +95,9 @@ func (a *Actors) IsActor(ctx context.Context, prctx pull.Context, user string) (
 		userType = "User"
 	}
 
-  if slices.Contains(a.UserTypes, userType) {
-    return true, nil
-  }
+	if slices.Contains(a.UserTypes, userType) {
+		return true, nil
+	}
 
 	if slices.Contains(a.Users, user) {
 		return true, nil
