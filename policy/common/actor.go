@@ -16,6 +16,7 @@ package common
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strings"
 
@@ -94,16 +95,12 @@ func (a *Actors) IsActor(ctx context.Context, prctx pull.Context, user string) (
 		userType = "User"
 	}
 
-	for _, t := range a.UserTypes {
-		if userType == t {
-			return true, nil
-		}
-	}
+  if slices.Contains(a.UserTypes, userType) {
+    return true, nil
+  }
 
-	for _, u := range a.Users {
-		if user == u {
-			return true, nil
-		}
+	if slices.Contains(a.Users, user) {
+		return true, nil
 	}
 
 	for _, t := range a.Teams {
